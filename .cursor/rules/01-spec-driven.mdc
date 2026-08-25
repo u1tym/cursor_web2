@@ -58,7 +58,7 @@ requirements.md のユーザ承認後に、次の順で作成する。
 - tasks.md に記載されたタスクのみ実装する
 - 実装前に requirements.md と 4 つの設計書を確認する
 - 要件と設計にない機能を勝手に追加しない
-- コードは `～/<feature-name>/{frontend,backend,tests}` に置く
+- コードは `src/features/<feature-name>/{frontend,backend,tests}` に置く
 
 ## レビューと承認
 

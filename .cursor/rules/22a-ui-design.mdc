@@ -2,6 +2,7 @@
 description: UI設計作成（日本語）。画面毎の部品配置と画面遷移
 globs:
   - "docs/specs/**/ui-design.md"
+alwaysApply: false
 ---
 
 見出しと本文は日本語で書くこと。

@@ -2,9 +2,12 @@
 description: タスク分解（日本語）
 globs:
   - "docs/specs/**/tasks.md"
+alwaysApply: false
 ---
 
 見出しと本文は日本語で書くこと。
+
+`docs/specs/templates/tasks-template.md` に従うこと。
 
 タスクは1〜4時間程度で完了できる粒度に分解すること。
 

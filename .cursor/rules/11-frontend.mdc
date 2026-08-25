@@ -1,10 +1,10 @@
 ---
 description: フロントエンド実装方式
-globs: "src/features/**/frontend/**/*.{vue,ts,tsx}"
+globs: "src/features/**/frontend/**/*.{vue,ts,css,scss}"
 alwaysApply: false
 ---
 
-フロントエンドは、`～/<feature-name>/frontend/`に置く
+フロントエンドは、`src/features/<feature-name>/frontend/`に置く
 
 ## 利用技術
 
@@ -35,3 +35,5 @@ alwaysApply: false
 - 例: `voice` → `VITE_API_VOICE_URL`
 
 `VITE_API_BASE_URL` や `API_BASE_URL` のような機能横断の名前は使わない。他機能の API 基点を流用しない。
+
+API を呼ぶときは Cookie を送る（credentials を含める）。セッション ID を `localStorage` や URL に置かない。

@@ -2,6 +2,7 @@
 description: 要件作成（日本語・EARS）
 globs:
   - "docs/specs/**/requirements.md"
+alwaysApply: false
 ---
 
 見出しと本文は日本語で書くこと。
@@ -15,6 +16,7 @@ globs:
 各要件には受け入れ条件を定義すること。
 
 設計内容（画面部品、テーブル定義、API パス、HTTP ステータス）を記述してはならない。
+認証の要否は書いてよい。Cookie、セッションテーブル、HTTP ステータスは書かない（それらは設計に書く）。
 
 ユーザがこのファイルを承認するまで、`design.md` を作成しないこと。
 

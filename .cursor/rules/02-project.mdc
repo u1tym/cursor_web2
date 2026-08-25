@@ -14,7 +14,9 @@ docs
     ├ ui-design-template.md
     ├ db-design-template.md
     ├ api-design-template.md
-    └ tasks-template.md
+    ├ tasks-template.md
+    ├ frontend.env.example
+    └ backend.env.example
 ```
 
 ## SPECのフォルダ構成
@@ -38,7 +40,7 @@ docs
 src
 └ features
   └ <feature-name>
-    ├ backend
-    ├ frontend
-    └ tests
+    ├ backend     # venv/、.env、SQL を含む
+    ├ frontend    # .env を含む
+    └ tests       # 同一機能の backend は import してよい。venv は backend/venv を使う
 ```

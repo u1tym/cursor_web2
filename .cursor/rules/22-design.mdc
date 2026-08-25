@@ -2,6 +2,7 @@
 description: 全体設計作成（日本語）。UI 詳細、テーブル定義、API 詳細は別ドキュメント
 globs:
   - "docs/specs/**/design.md"
+alwaysApply: false
 ---
 
 見出しと本文は日本語で書くこと。
