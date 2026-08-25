@@ -20,14 +20,14 @@ globs:
   - 主キー・一意制約・外部キー
   - インデックス
 
-API のパスや画面の詳細は書かないこと（それらは `api-design.md` / `design.md`）。
+API のパスや画面の詳細は書かないこと（それらは `api-design.md` / `ui-design.md`）。
 
 要件に存在しないテーブルや列を追加しないこと。
 
 機能ディレクトリが kebab-case の場合、スキーマ名は snake_case（例: `order-history` → `order_history`）。
 機能固有テーブルは機能スキーマに置き、`public` に業務テーブルを増やさないこと。
 
-ユーザが `design.md` を承認するまで、このファイルを作成しないこと。
+ユーザが `ui-design.md` を承認するまで、このファイルを作成しないこと。
 ユーザがこのファイルを承認するまで、`api-design.md` を作成しないこと。
 
 承認欄は履歴形式とする（日時・状態・変更概要。詳細は `01-spec-driven.mdc`）。

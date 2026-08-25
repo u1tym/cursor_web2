@@ -69,6 +69,7 @@ venv を backend 配下に作成し、uvicorn で起動できるようにする�
 ### 関連設計
 
 - `design.md` / フロントエンド設計 / API クライアント
+- `ui-design.md` / 画面詳細
 - `api-design.md` / エンドポイント
 
 ### 実装パス

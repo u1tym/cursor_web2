@@ -12,6 +12,7 @@
 関連ドキュメント:
 
 - 全体設計: `design.md`
+- UI設計: `ui-design.md`
 - API設計: `api-design.md`
 
 ## ER図

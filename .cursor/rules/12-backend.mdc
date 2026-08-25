@@ -19,8 +19,8 @@ def get_item(item_id):
 def get_item(item_id: int) -> Item | None:
     ...
 ```
-- 仮想環境は、**このディレクトリ配下** に作る（例: `env/`）。システム Python に直接依存しない。
-- その env を有効化し、このディレクトリをカレントにして **uvicorn** を起動する（例: `uvicorn app.main:app`）。
+- 仮想環境は、**このディレクトリ配下** に `venv/` として作る。システム Python に直接依存しない。
+- その venv を有効化し、このディレクトリをカレントにして **uvicorn** を起動する（例: `uvicorn app.main:app`）。
 - 機能ごとに **別プロセスの FastAPI** として動く。他機能の Python モジュールを import しない。
 - 機能ごとの `app` パッケージはプロセスが違うため名前は衝突しない。
 

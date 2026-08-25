@@ -39,5 +39,6 @@ src
 └ features
   └ <feature-name>
     ├ backend
-    └ frontend
+    ├ frontend
+    └ tests
 ```

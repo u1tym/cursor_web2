@@ -32,10 +32,13 @@ requirements.md のユーザ承認後に、次の順で作成する。
 
 1. `design.md`（全体構成）
    - テンプレート: `design-template.md`
+   - 画面毎の部品配置と画面遷移は書かない（`ui-design.md`）
    - API のパス・要求・応答・エラーは書かない
    - テーブル定義と ER 図は書かない
 2. `ui-design.md`（UI 設計。`design.md` のユーザ承認後）
    - テンプレート: `ui-design-template.md`
+   - 画面毎の部品配置と画面遷移を書く
+   - 起動・モジュール構成、API の契約、テーブル定義は書かない
 3. `db-design.md`（ER 図とテーブル設計。`ui-design.md` のユーザ承認後）
    - テンプレート: `db-design-template.md`
 4. `api-design.md`（エンドポイントの契約。`db-design.md` のユーザ承認後）

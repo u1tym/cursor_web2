@@ -4,7 +4,7 @@
 
 この設計書が対象とする機能の概要。`requirements.md` の REQ-xxx を満たすことだけを書く。
 
-API のパス・要求・応答は `api-design.md`、テーブル定義と ER 図は `db-design.md` に書く。
+画面毎の部品配置と画面遷移は `ui-design.md`、API のパス・要求・応答は `api-design.md`、テーブル定義と ER 図は `db-design.md` に書く。
 
 ## 構成
 
@@ -15,6 +15,7 @@ API のパス・要求・応答は `api-design.md`、テーブル定義と ER �
 
 関連ドキュメント:
 
+- UI設計: `ui-design.md`
 - DB設計: `db-design.md`
 - API設計: `api-design.md`
 
@@ -24,11 +25,15 @@ API のパス・要求・応答は `api-design.md`、テーブル定義と ER �
 
 ### 画面
 
+画面の一覧のみ（画面名、パス、役割）。部品配置と遷移の詳細は `ui-design.md`。
+
 | 画面 | パス | 説明 |
 |------|------|------|
 | ＜画面名＞ | `/＜path＞` | ＜役割＞ |
 
 ### コンポーネント
+
+構成上の単位（ページ、共有部品）の名前と役割のみ。配置の詳細は `ui-design.md`。
 
 ### 状態管理
 
@@ -73,7 +78,7 @@ API のパス・要求・応答は `api-design.md`、テーブル定義と ER �
 | REQ-001 | ＜画面またはモジュール＞ |
 | REQ-002 | ＜画面またはモジュール＞ |
 
-API 側の対応は `api-design.md`、テーブル側は `db-design.md`。
+画面側の対応は `ui-design.md`、API 側は `api-design.md`、テーブル側は `db-design.md`。
 
 ## 未決事項
 

@@ -13,12 +13,11 @@ alwaysApply: false
 - デバッグ実行では、**このディレクトリ配下**で、`npm run dev`で起動できること
 - nginxでデプロイすることを想定
 
-## 画面レイアウト
+## 画面の見た目
 
-- ページとしてはスクロールさせないデザインとする
-- 部品内でのスクロールは可（一覧表示させた場合のスクロール表示等）
-- PCおよびスマートフォンを表示対象として想定し、レスポンシブデザインとする
-- Google Chrome、Safariを表示対象として想定する
+見た目・部品名・画面骨格は `15-ui-style.mdc` に従う。
+
+他機能の Vue / CSS / コンポーネントを import しない。トークンが必要なら、この機能の `frontend/` に同じ値を置く。
 
 ## 設定値
 
@@ -30,9 +29,9 @@ alwaysApply: false
 ### APIの基点URL
 
 機能毎のAPI参照時のURLは、その機能専用の環境変数で設定する。
-名称は、`API_<FEATURE>_URL` とする。
+名称は、`VITE_API_<FEATURE>_URL` とする。
 
 - `<FEATURE>` は機能名（`<feature-name>`）を大文字にし、ハイフンをアンダースコアにする
-- 例: `voice` → `API_VOICE_URL`
+- 例: `voice` → `VITE_API_VOICE_URL`
 
-`API_BASE_URL` のような機能横断の名前は使わない。他機能の API 基点を流用しない。
+`VITE_API_BASE_URL` や `API_BASE_URL` のような機能横断の名前は使わない。他機能の API 基点を流用しない。

@@ -16,4 +16,4 @@ globs:
 
 ユーザが `design.md` / `ui-design.md` / `db-design.md` / `api-design.md` をすべて承認するまで、このファイルを作成しないこと。
 
-承認欄は履歴形式とする（日時・状態・変更概要。詳細は `01-spec-driven`）。
+承認欄は履歴形式とする（日時・状態・変更概要。詳細は `01-spec-driven.mdc`）。

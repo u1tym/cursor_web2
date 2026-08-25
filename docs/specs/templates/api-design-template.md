@@ -7,6 +7,7 @@
 関連ドキュメント:
 
 - 全体設計: `design.md`
+- UI設計: `ui-design.md`
 - DB設計: `db-design.md`
 
 ## 共通
