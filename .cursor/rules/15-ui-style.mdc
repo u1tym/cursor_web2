@@ -6,81 +6,460 @@ globs:
 alwaysApply: false
 ---
 
-他機能の SPEC・Vue・CSS を参照・import しない。色・余白・部品の見た目はこのルールに合わせ、各機能の `frontend/` に同じ値を置く。
+他機能の SPEC・Vue・CSS を参照・import しない。
+色・余白・部品の見た目はこのルールに合わせ、各機能の `frontend/` に同じ値を置く。
 
-画面に何を置くか、月 / 週 / 日のどれにするか、遷移先は **各機能の `ui-design.md` で決める**。このルールは見た目だけを規定する。
 
-## 枠
+## 前提
 
 - ページ全体はスクロールさせない。部品内のスクロールは可。
-- 対象: PC とスマートフォン。ブラウザ: Google Chrome、Safari。
+- 対象: PC とスマートフォン。
+- 想定ブラウザ: Google Chrome、Safari。
 - ブレークポイント: **768px 未満をスマートフォン**。
 - 余白の単位は `--space`（8px）の倍数。画面内余白は 24px。タップ高さは `--tap`。
 
-## トークン
 
-各機能の CSS に同じ変数を定義する（他機能から import しない）。機能独自の色・角丸・フォントは置かない。
+## Design Rules
 
-```css
-:root {
-  --color-bg: #f5f6f8;
-  --color-surface: #ffffff;
-  --color-text: #1f2937;
-  --color-text-muted: #6b7280;
-  --color-border: #e5e7eb;
-  --color-primary: #2563eb;
-  --color-primary-text: #ffffff;
-  --color-danger: #dc2626;
-  --color-success: #16a34a;
-  --color-warning: #d97706;
-  --space: 8px;
-  --radius: 8px;
-  --font-size: 16px;
-  --font-size-title: 20px;
-  --tap: 40px;
-}
+### Purpose
+
+本アプリは複数の機能を統合したワークスペースとして設計する。
+
+ユーザーは機能ごとの違いを意識するのではなく、一貫した操作感の中で情報を管理できることを目指す。
+
+新機能追加時も既存のデザインパターンへ適合させ、画面ごとに異なるデザインを作らない。
+
+
+## Design Concept
+
+### Keywords
+
+- Simple
+- Calm
+- Modern
+- Consistent
+- Spacious
+- Extensible
+
+### UX Principle
+
+情報を主役とする。
+
+装飾を目的としたデザインは避け、視認性・操作性・拡張性を優先する。
+
+以下を常に意識する。
+
+- 学習コストが低い
+- 情報を探しやすい
+- 操作ミスしにくい
+- 機能追加時も破綻しない
+
+
+## Core Principles
+
+### Consistency First
+
+機能ごとに専用UIを作らない。
+
+同じ役割のものは必ず同じ見た目とする。
+
+例
+- 一覧は同じレイアウト
+- 詳細は同じレイアウト
+- 設定は同じレイアウト
+- ダイアログは同じレイアウト
+
+### Information First
+
+情報を主役とする。
+
+避けること
+
+- 過剰な装飾
+- 派手なグラデーション
+- 強いシャドウ
+- 不要なアニメーション
+
+優先すること
+
+- 可読性
+- 視線誘導
+- 情報密度の最適化
+
+
+### Pattern Reuse
+
+新機能追加時は既存パターンを再利用する。
+
+優先順位
+```
+既存コンポーネント再利用
+↓
+既存レイアウト再利用
+↓
+新パターン追加
 ```
 
-- ページ背景 `--color-bg`、パネル `--color-surface`、本文 `--color-text`、補足 `--color-text-muted`、枠線 `--color-border`。
-- フォントはシステム UI。本文 16px、見出し 20px。
+## Responsive Design
 
-## 部品の見た目
+対応デバイス
+- Desktop
+- Mobile
 
-同じ役割の部品は、次の見た目にする。呼び方は揃える（主ボタン、副ボタン、など）。置くかどうかは機能の設計で決める。
+### Desktop Layout
+```
+┌──────────────────────────────┐
+│ Header                       │
+├────────┬─────────────────────┤
+│ Nav    │ Content             │
+└────────┴─────────────────────┘
+```
 
-| 部品 | 見た目 |
-|------|--------|
-| 見出し | 20px、`--color-text` |
-| 説明文 | 16px、`--color-text-muted` |
-| 主ボタン | 塗り `--color-primary`、文字 `--color-primary-text`、高さ `--tap`、角丸 `--radius` |
-| 副ボタン | 白地、枠 `--color-border`、文字 `--color-text`、高さ `--tap`、角丸 `--radius` |
-| 危険ボタン | 塗り `--color-danger`、文字白、高さ `--tap`、角丸 `--radius` |
-| テキスト入力 / 数値入力 / 日付入力 / 選択 / チェック / 検索 | 白地、枠 `--color-border`、角丸 `--radius`。ラベルは入力の上。必須はラベル横に「必須」 |
-| 一覧 | ヘッダ行は固定、本体だけスクロール。行の枠は `--color-border`。行内の横スクロールはしない |
-| メッセージ | 情報は枠のみ。成功 `--color-success`、警告 `--color-warning`、エラー `--color-danger` |
-| モーダル | パネル `--color-surface`、角丸 `--radius`、背面は薄い暗幕 |
-| リンク | 文字 `--color-primary`、下線なし |
+#### Rules
 
-### カレンダーを置く場合
+- Navigationは左固定
+- コンテンツ領域を最大化
+- 複数カラム利用可
+- 一覧＋詳細の同時表示可
 
-月・週・日のどれを出すか、週の始まり、時刻の範囲、初期スクロールは `ui-design.md` で決める。見た目だけ次に合わせる。
 
-- **月グリッド**: 今日は枠 `--color-primary`。対象月以外の日は `--color-text-muted`。予定がある日は `--color-primary` の点または件数。曜日見出しは `--color-text-muted`。
-- **時刻グリッド（週・日）**: 時刻軸は `--color-text-muted`。今日の列または当日は枠 `--color-primary`。現在時刻は `--color-primary` の横線。予定ブロックは塗り `--color-primary`、文字 `--color-primary-text`、角丸 `--radius`。終日はグリッド上端の帯。
-- スマートフォンではセルやブロックの文字を短くし、はみ出しは部品内スクロールにする。
+### Mobile Layout
 
-## 状態の見た目
+```
+┌─────────────────┐
+│ Header          │
+├─────────────────┤
+│                 │
+│ Content         │
+│                 │
+├─────────────────┤
+│ Bottom Nav      │
+└─────────────────┘
+```
 
-| 状態 | 見た目 |
-|------|--------|
-| 読込中 | 領域の中央に「読み込み中…」。操作は無効 |
-| 空（表） | 本体に「データがありません」 |
-| 空（カレンダー） | グリッドは出し、予定の無いマスは空（「データがありません」は出さない） |
-| エラー | メッセージ（エラー）を対象領域の先頭。操作は可能なら維持 |
-| 成功 | メッセージ（成功）を対象領域の先頭。数秒で消してよい |
+#### Rules
 
-## 文言
+- Bottom Navigation固定
+- 単一カラム
+- 縦スクロール中心
+- 一覧と詳細は画面遷移で分離
 
-同じ意味の操作は、次の語を優先する。機能固有の動詞は `ui-design.md` に書いてよい。
 
-保存、キャンセル、戻る、削除、新規、編集、確定、閉じる、検索、前月、次月、今月、前週、次週、今週、前日、翌日、今日。
+### Responsive Principle
+
+変更してよいもの
+
+- 配置
+- サイズ
+- 情報密度
+
+変更してはいけないもの
+
+- 概念
+- 操作フロー
+- デザイン言語
+
+
+## Navigation
+
+### Desktop
+
+左サイドナビゲーション
+
+#### Rules
+
+- 常時表示
+- アイコン＋ラベル
+- 現在地を明確化
+- 階層は浅く保つ
+
+
+### Mobile
+
+ボトムナビゲーション
+
+#### Rules
+
+- 主要機能のみ表示
+- 項目数は最小限
+- 片手操作を前提
+
+
+## Information Hierarchy
+
+画面内の情報は以下の順で認識できること。
+
+```
+Primary
+↓
+Secondary
+↓
+Tertiary
+```
+
+### Primary
+
+- タイトル
+- 主要コンテンツ
+- 主要アクション
+
+### Secondary
+
+- 状態
+- 分類
+- ラベル
+- カテゴリ
+
+### Tertiary
+
+- 更新日時
+- 作成日時
+- メタ情報
+
+
+
+## Color System
+
+### Philosophy
+
+アプリ全体はニュートラルカラーをベースとする。
+
+テーマカラーは機能識別のために使用する。
+
+画面全体をテーマカラーで染めない。
+
+### Base Colors
+```
+Background   #F8F9FC
+Surface      #FFFFFF
+
+Text Main    #1F2937
+Text Sub     #6B7280
+
+Border       #E5E7EB
+```
+
+### Theme Colors
+
+各機能は固有のテーマカラーを持つ。
+
+すべてパステルトーンで統一する。
+
+```
+Blue      #8FB4FF
+Purple    #B7A3FF
+Green     #8DD8C4
+Orange    #FFC89A
+Pink      #FFB6C8
+Yellow    #F8E28E
+Teal      #8FCFD1
+```
+
+### Theme Color Usage
+
+テーマカラーを利用する箇所
+
+#### Navigation
+
+- 選択中アイテム
+- アイコン
+- アクティブインジケータ
+
+#### Header
+
+vアクセントライン
+- タイトル補助表現
+
+#### Cards
+
+- ラベル
+- タグ
+- 左ライン
+
+
+#### Buttons
+
+- Primary Button
+
+
+#### Charts
+
+- データ系列
+
+### Theme Color Restrictions
+
+禁止事項
+
+```
+画面全体背景への適用
+高彩度カラー
+蛍光色
+機能ごとの独自配色ルール
+```
+
+## Components
+
+### Cards
+
+情報表示の基本単位とする。
+
+#### Rules
+
+```
+Radius: 16px
+```
+用途によってスタイルを変えない。
+
+### Buttons
+
+#### Primary
+
+主要操作のみ
+
+例
+
+```
+Create
+Save
+Submit
+Add
+```
+
+#### Secondary
+
+補助操作
+
+例
+
+```
+Back
+Cancel
+Close
+```
+
+### Text Button
+
+軽量な操作
+
+例
+
+```
+View Details
+Open
+More
+```
+
+
+## Spacing
+
+余白は統一する。
+
+利用可能な値
+
+```
+8px
+16px
+24px
+32px
+```
+
+原則として上記以外を使用しない。
+
+## Typography
+
+### Philosophy
+
+タイポグラフィで情報の優先順位を作る。
+
+色や装飾に依存しない。
+
+#### Levels
+
+```
+Page Title
+Section Title
+Body
+Caption
+```
+
+見出し階層は明確にする。
+
+
+## Elevation
+
+影は最小限にする。
+
+### Rules
+
+- 大きな影は使わない
+- 浮遊感は控えめ
+- 情報の階層表現のみ使用
+
+## Motion
+
+目的は演出ではなく理解補助。
+
+### Rules
+
+```
+Duration:
+150ms〜250ms
+```
+
+適用箇所
+
+- Hover
+- Expand
+- Dialog
+- Navigation Transition
+
+
+### Avoid
+
+- 派手なアニメーション
+- 長時間アニメーション
+- 意味のない動き
+
+## Accessibility
+
+必須要件
+
+- 十分なコントラスト
+- キーボード操作対応
+- フォーカス表示
+- タップ領域確保
+
+
+### Mobile
+
+最小タップ領域
+
+```
+44px × 44px
+```
+以上とする。
+
+
+## Future Feature Rule
+
+新機能追加時は以下を確認する。
+
+既存コンポーネントで実現できるか
+既存レイアウトで実現できるか
+既存のテーマカラー運用へ適合するか
+PCとMobileで同じ概念を維持できるか
+ユーザーに新しい操作を学習させないか
+
+すべて満たせない場合のみ、新しいUIパターンを追加する。
+
+## Design Statement
+
+Structure is shared. Color identifies. Information leads.
+
+- レイアウトは統一する
+- 機能は色で識別する
+- 情報を最優先する
+- パステルカラーで上品さを保つ
+- PCとMobileで同じ体験を提供する
+- 将来の機能追加でも破綻しないデザインを維持する
+
