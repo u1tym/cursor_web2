@@ -1,0 +1,43 @@
+---
+description: フォルダ構成
+alwaysApply: true
+---
+
+# SPECのテンプレート
+
+```
+docs
+└ specs
+  └ templates
+    ├ requirements-template.md
+    ├ design-template.md
+    ├ ui-design-template.md
+    ├ db-design-template.md
+    ├ api-design-template.md
+    └ tasks-template.md
+```
+
+## SPECのフォルダ構成
+
+機能毎にまとめて作成する。
+```
+docs
+└ specs
+  └ <feature-name>
+    ├ requirements.md
+    ├ design.md
+    ├ ui-design.md
+    ├ db-design.md
+    ├ api-design.md
+    └ tasks.md
+```
+
+## 生成コードのフォルダ構成
+
+```
+src
+└ features
+  └ <feature-name>
+    ├ backend
+    └ frontend
+```

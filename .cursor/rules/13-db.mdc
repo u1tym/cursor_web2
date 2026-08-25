@@ -1,0 +1,16 @@
+---
+description: DB方式
+globs: "src/features/**/*.{sql,py}"
+alwaysApply: false
+---
+
+## 利用技術
+
+- RDBMS: **PostgreSQL**
+- 接続情報: `Server` / `Database` / `Port` / `Username` / `Password`
+
+## スキーマ
+
+- 機能毎に **機能名のスキーマ** を作成し、その中にテーブル等を配置する。
+- 機能ディレクトリが kebab-case（例: `order-history`）の場合、スキーマ名はハイフンを使わず snake_case（例: `order_history`）にする。
+- 共通的なものは、スキーマ `public` に配置する。
