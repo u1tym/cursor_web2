@@ -29,6 +29,8 @@ def session_expiry(timeout_minutes: int, now: datetime | None = None) -> datetim
 
 
 def to_data_url(media_type: str, data: bytes) -> str:
+    if media_type.strip() == "" or not data:
+        return ""
     payload = base64.b64encode(bytes(data)).decode("ascii")
     return f"data:{media_type};base64,{payload}"
 

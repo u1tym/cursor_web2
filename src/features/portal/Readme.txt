@@ -59,10 +59,11 @@ API:  http://localhost:8000
   python -m app.cli user delete <ユーザ名>
 
 機能
-  python -m app.cli feature add <機能ID> <タイトル> <遷移先URL> <アイコンファイル>
+  python -m app.cli feature add <機能ID> <タイトル> <遷移先URL> [アイコンファイル]
   python -m app.cli feature update <機能ID> --title <タイトル> --url <遷移先URL> --icon <アイコンファイル>
   python -m app.cli feature delete <機能ID>
 
+  add のアイコンファイルは省略できる。省略したときはアイコンなしで登録する。
   update の --title / --url / --icon は必要なものだけ指定する。
   アイコンは png / jpg / jpeg / gif / webp。DB に格納し、リポジトリには置かない。
 

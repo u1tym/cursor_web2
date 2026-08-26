@@ -61,7 +61,7 @@ async function onLogout(): Promise<void> {
         type="button"
         @click="openFeature(item)"
       >
-        <img :src="item.icon" alt="" />
+        <img v-if="item.icon" :src="item.icon" alt="" />
         <span>{{ item.title }}</span>
       </button>
     </div>

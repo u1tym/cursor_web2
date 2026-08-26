@@ -94,7 +94,10 @@ def cmd_user_delete(args: argparse.Namespace) -> int:
 def cmd_feature_add(args: argparse.Namespace) -> int:
     if get_feature(args.id) is not None:
         raise CliError("同じ機能IDは登録できません")
-    icon, media_type = _read_icon(args.icon)
+    if args.icon:
+        icon, media_type = _read_icon(args.icon)
+    else:
+        icon, media_type = b"", ""
     insert_feature(args.id, args.title, args.url, icon, media_type)
     print("追加しました")
     return 0
@@ -175,7 +178,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_feat.add_argument("id")
     add_feat.add_argument("title")
     add_feat.add_argument("url")
-    add_feat.add_argument("icon")
+    add_feat.add_argument("icon", nargs="?", default=None)
     add_feat.set_defaults(func=cmd_feature_add)
 
     upd_feat = feature_sub.add_parser("update")

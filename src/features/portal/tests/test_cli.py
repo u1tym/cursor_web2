@@ -26,6 +26,16 @@ def test_cli_user_add_list_delete(tmp_path: Path, capsys) -> None:
     assert main(["user", "delete", _unique("missing")]) == 1
 
 
+def test_cli_feature_add_without_icon() -> None:
+    feature_id = _unique("noicon")
+    assert main(["feature", "add", feature_id, "アイコンなし", "http://localhost/n"]) == 0
+    feat = get_feature(feature_id)
+    assert feat is not None
+    assert feat.title == "アイコンなし"
+    assert feat.icon == b""
+    assert feat.icon_media_type == ""
+
+
 def test_cli_feature_and_menu(tmp_path: Path) -> None:
     icon = tmp_path / "icon.png"
     icon.write_bytes(PNG_1X1)
