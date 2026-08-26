@@ -40,7 +40,7 @@ docs
 src
 └ features
   └ <feature-name>
-    ├ backend     # venv/、.env、SQL を含む
+    ├ backend     # venv/、.env、SQL、log/ を含む
     ├ frontend    # .env を含む
     └ tests       # 同一機能の backend は import してよい。venv は backend/venv を使う
 ```

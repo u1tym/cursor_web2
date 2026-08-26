@@ -5,6 +5,7 @@ from pydantic import BaseModel, field_validator
 
 from app.config import load_config
 from app.deps import AuthContext, get_current_user
+from app.logger import safe_text, write
 from app.security import clear_session_cookie, set_session_cookie
 from app.services.auth_service import LoginFailedError, authenticate, logout
 
@@ -25,6 +26,7 @@ class LoginBody(BaseModel):
 
 @router.post("/login", status_code=204)
 def login(body: LoginBody, request: Request, response: Response) -> None:
+    write("INF", f"ログイン要求 username={safe_text(body.username)}")
     try:
         _user, session_id = authenticate(body.username, body.password)
     except LoginFailedError:

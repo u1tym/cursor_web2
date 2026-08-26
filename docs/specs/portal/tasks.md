@@ -12,7 +12,7 @@
 
 関連要件:
 
-- REQ-001 〜 REQ-019
+- REQ-001 〜 REQ-020
 
 ---
 
@@ -428,12 +428,57 @@ PostgreSQL へ接続する。ユーザ、セッション、システム設定、
 
 ---
 
+## タスク 12
+
+### タイトル
+
+ログイン試行のファイルログを実装する
+
+### 見積もり
+
+2時間
+
+### 関連要件
+
+- REQ-007, REQ-020
+
+### 関連設計
+
+- `design.md` / バックエンド設計 / モジュール構成（`app/logger.py`, `log/`）
+- `design.md` / バックエンド設計 / 業務ロジック（ログインのログ）
+- `.cursor/rules/16-logging.mdc`
+
+### 実装パス
+
+- `src/features/portal/backend/app/logger.py`
+- `src/features/portal/backend/app/config.py`
+- `src/features/portal/backend/app/main.py`
+- `src/features/portal/backend/app/services/auth_service.py`
+- `src/features/portal/backend/app/routers/auth.py`
+- `src/features/portal/backend/.env`（ひな型: `docs/specs/templates/backend.env.example`）
+- `src/features/portal/tests/`
+
+### 内容
+
+`backend/log/` へファイルログを出す。1 行はタイムスタンプ、区分（INF / WRN / ERR / DBG）、メッセージ。ログインが試みられたとき、ユーザ名（入力）、判断結果、失敗時の内部理由を出す。パスワードとセッション ID は出さない。画面へ返す失敗文言は従来どおり詳細を出さない。`.env` の `LOG_MAX_BYTES` と `LOG_BACKUP_COUNT` でサイズローテーションする。開発用初期値は 10485760 と 5。起動時にロガーを初期化する。
+
+### 完了条件
+
+- [ ] ログイン成功で INF が残り、ユーザ名と判断結果が含まれる
+- [ ] ログイン失敗で WRN が残り、画面へ出さない内部理由が含まれる
+- [ ] パスワードとセッション ID がログに含まれない
+- [ ] `LOG_MAX_BYTES` と `LOG_BACKUP_COUNT` を `.env` から読む
+- [ ] ログファイルをリポジトリに含めていない
+
+---
+
 ## テスト
 
 ### 単体テスト
 
 - [ ] `src/features/portal/tests/` に配置する
 - [ ] パスワードハッシュ、論理削除ユーザの認証拒否、メニューが自ユーザ・未削除のみ、data URL 化を確認する
+- [ ] ログイン成功・失敗のログ（ユーザ名・判断・失敗理由、パスワード非出力）を確認する
 
 ### 結合テスト
 
@@ -454,3 +499,5 @@ PostgreSQL へ接続する。ユーザ、セッション、システム設定、
 | 2026-08-26 09:16 | 未承認 | 開発用 DB を TSTDB / TSTUSER に変更。作成手順をタスク 2 に追加 |
 | 2026-08-26 09:21 | 未承認 | 開発用 DB 名とユーザ名を小文字（tstdb / tstuser）に変更 |
 | 2026-08-26 09:44 | 承認済み | タスクを承認 |
+| 2026-08-26 22:14 | 未承認 | タスク 12（ログイン試行のファイルログ）を追加 |
+| 2026-08-26 22:16 | 承認済み | タスク 12（ログイン試行のファイルログ）を承認 |

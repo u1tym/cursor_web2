@@ -42,6 +42,8 @@ class Config:
     cors_origins: list[str]
     session_timeout_minutes: int
     debug_user: str | None
+    log_max_bytes: int
+    log_backup_count: int
 
 
 def load_config() -> Config:
@@ -60,4 +62,6 @@ def load_config() -> Config:
         cors_origins=origins,
         session_timeout_minutes=int(timeout_raw),
         debug_user=debug,
+        log_max_bytes=int(values.get("LOG_MAX_BYTES") or "10485760"),
+        log_backup_count=int(values.get("LOG_BACKUP_COUNT") or "5"),
     )
