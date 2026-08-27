@@ -56,12 +56,26 @@ body,
   padding: calc(var(--space) * 3);
 }
 
+.login-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--space) * 3);
+  width: 100%;
+  max-width: 320px;
+}
+
+.login-logo {
+  width: 160px;
+  height: auto;
+  object-fit: contain;
+}
+
 .login-form {
   display: flex;
   flex-direction: column;
   gap: calc(var(--space) * 2);
   width: 100%;
-  max-width: 320px;
 }
 
 .login-form input,
