@@ -1,5 +1,22 @@
 export type WeekStart = "sunday" | "monday";
 
+const MONTHS_FULL = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 export type DayCell = {
   iso: string;
   inMonth: boolean;
@@ -19,7 +36,11 @@ export function parseIso(iso: string): Date {
 }
 
 export function monthLabel(year: number, monthIndex: number): string {
-  return `${year}年${monthIndex + 1}月`;
+  return `${MONTHS_FULL[monthIndex]} ${year}`;
+}
+
+export function monthLabelPadded(year: number, monthIndex: number): string {
+  return `${MONTHS_SHORT[monthIndex]} ${year}`;
 }
 
 export function addMonths(year: number, monthIndex: number, delta: number): { year: number; monthIndex: number } {
@@ -30,11 +51,11 @@ export function addMonths(year: number, monthIndex: number, delta: number): { ye
 export function weekdayHeaders(weekStartsOn: WeekStart): { label: string; kind: "sat" | "sun" | "other" }[] {
   const names =
     weekStartsOn === "sunday"
-      ? ["日", "月", "火", "水", "木", "金", "土"]
-      : ["月", "火", "水", "木", "金", "土", "日"];
+      ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+      : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   return names.map((label) => ({
     label,
-    kind: label === "土" ? "sat" : label === "日" ? "sun" : "other",
+    kind: label === "Sat" ? "sat" : label === "Sun" ? "sun" : "other",
   }));
 }
 

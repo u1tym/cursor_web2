@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import {
   AuthError,
   createCategory,
@@ -31,17 +31,27 @@ import {
   dateTone,
   monthCells,
   monthLabel,
+  monthLabelPadded,
   overlapsDay,
   toIso,
   weekdayHeaders,
   type DayCell,
 } from "../calendar";
+import { setHolidaySettingsHandler } from "../holiday-settings";
+import { monthLinks, setMonthHandler } from "../month-nav";
+import {
+  categoryNavBusy,
+  categoryNavItems,
+  categoryNavShowDeleted,
+  setCategoryNavHandlers,
+} from "../category-nav";
 
 const emit = defineEmits<{ "auth-error": [unknown] }>();
 
 const PC_VISIBLE = 3;
 
-const busy = ref(true);
+const busy = ref(false);
+const ready = ref(false);
 const error = ref("");
 const success = ref("");
 const isMobile = ref(false);
@@ -200,16 +210,22 @@ async function loadAll(): Promise<void> {
   busy.value = true;
   error.value = "";
   try {
-    prefs.value = await getPreferences();
-    categories.value = await getCategories(true);
-    allUserHolidays.value = await getAllUserHolidays();
+    const [nextPrefs, nextCategories, nextHolidays] = await Promise.all([
+      getPreferences(),
+      getCategories(true),
+      getAllUserHolidays(),
+    ]);
+    prefs.value = nextPrefs;
+    categories.value = nextCategories;
+    allUserHolidays.value = nextHolidays;
     await loadMonth();
   } catch (caught) {
     if (!handle(caught)) {
-      error.value = "サーバエラーです";
+      error.value = "Server error";
     }
   } finally {
     busy.value = false;
+    ready.value = true;
   }
 }
 
@@ -227,7 +243,7 @@ async function loadMonth(): Promise<void> {
 async function persistPrefs(next: Preferences): Promise<void> {
   const saved = await savePreferences(next);
   if (saved === "invalid") {
-    error.value = "入力が不正です";
+    error.value = "Invalid input";
     return;
   }
   prefs.value = saved;
@@ -243,7 +259,7 @@ async function changeWeek(value: string): Promise<void> {
     await loadMonth();
   } catch (caught) {
     if (!handle(caught)) {
-      error.value = "サーバエラーです";
+      error.value = "Server error";
     }
   } finally {
     busy.value = false;
@@ -262,7 +278,7 @@ async function toggleHiddenCategory(categoryId: number): Promise<void> {
     await persistPrefs({ ...prefs.value, hidden_category_ids: [...current] });
   } catch (caught) {
     if (!handle(caught)) {
-      error.value = "サーバエラーです";
+      error.value = "Server error";
     }
   } finally {
     busy.value = false;
@@ -276,7 +292,7 @@ async function toggleShowDeleted(): Promise<void> {
     categories.value = await getCategories(true);
   } catch (caught) {
     if (!handle(caught)) {
-      error.value = "サーバエラーです";
+      error.value = "Server error";
     }
   } finally {
     busy.value = false;
@@ -300,6 +316,12 @@ function goToday(): void {
   void reloadMonth();
 }
 
+function goToMonth(nextYear: number, nextMonthIndex: number): void {
+  year.value = nextYear;
+  monthIndex.value = nextMonthIndex;
+  void reloadMonth();
+}
+
 async function reloadMonth(): Promise<void> {
   busy.value = true;
   error.value = "";
@@ -307,7 +329,7 @@ async function reloadMonth(): Promise<void> {
     await loadMonth();
   } catch (caught) {
     if (!handle(caught)) {
-      error.value = "サーバエラーです";
+      error.value = "Server error";
     }
   } finally {
     busy.value = false;
@@ -385,7 +407,7 @@ function payload(): SchedulePayload | null {
     return null;
   }
   if (form.category_id === null) {
-    formError.value = "カテゴリを追加してください";
+    formError.value = "Add a category first";
     return null;
   }
   if (!rangeValid()) {
@@ -424,27 +446,27 @@ async function saveSchedule(): Promise<void> {
     const result =
       form.id === null ? await createSchedule(body) : await updateSchedule(form.id, body);
     if (result === "invalid") {
-      formError.value = "入力が不正です";
+      formError.value = "Invalid input";
       return;
     }
     if (result === "missing") {
-      formError.value = "対象がありません";
+      formError.value = "Not found";
       return;
     }
     if (form.id !== null && form.kind === "todo" && result.is_completed !== form.is_completed) {
       const completion = await updateCompletion(form.id, form.is_completed);
       if (completion === "missing" || completion === "conflict") {
-        formError.value = "保存できませんでした";
+        formError.value = "Could not save";
         return;
       }
     }
     scheduleOpen.value = false;
-    flash("保存しました");
+    flash("Saved");
     await loadMonth();
     categories.value = await getCategories(true);
   } catch (caught) {
     if (!handle(caught)) {
-      formError.value = "サーバエラーです";
+      formError.value = "Server error";
     }
   } finally {
     busy.value = false;
@@ -460,13 +482,13 @@ async function toggleTodo(item: ScheduleItem, event: Event): Promise<void> {
   try {
     const result = await updateCompletion(item.id, item.is_completed !== true);
     if (result === "missing" || result === "conflict") {
-      error.value = "保存できませんでした";
+      error.value = "Could not save";
       return;
     }
     await loadMonth();
   } catch (caught) {
     if (!handle(caught)) {
-      error.value = "サーバエラーです";
+      error.value = "Server error";
     }
   } finally {
     busy.value = false;
@@ -487,35 +509,35 @@ async function confirmDelete(): Promise<void> {
     if (confirmKind.value === "schedule") {
       const result = await deleteSchedule(confirmId.value);
       if (result === "missing") {
-        error.value = "対象がありません";
+        error.value = "Not found";
       } else {
         scheduleOpen.value = false;
-        flash("削除しました");
+        flash("Deleted");
         await loadMonth();
       }
     } else if (confirmKind.value === "category") {
       const result = await deleteCategory(confirmId.value);
       if (result === "missing") {
-        error.value = "対象がありません";
+        error.value = "Not found";
       } else {
-        flash("削除しました");
+        flash("Deleted");
         categories.value = await getCategories(true);
         await loadMonth();
       }
     } else {
       const result = await deleteUserHoliday(confirmId.value);
       if (result === "missing") {
-        error.value = "対象がありません";
+        error.value = "Not found";
       } else {
         holidayOpen.value = false;
-        flash("削除しました");
+        flash("Deleted");
         allUserHolidays.value = await getAllUserHolidays();
         await loadMonth();
       }
     }
   } catch (caught) {
     if (!handle(caught)) {
-      error.value = "サーバエラーです";
+      error.value = "Server error";
     }
   } finally {
     confirmKind.value = null;
@@ -537,6 +559,14 @@ function openCategoryEdit(item: CategoryItem, event: Event): void {
   categoryOpen.value = true;
 }
 
+function openCategoryEditById(id: number, event: Event): void {
+  const item = categories.value.find((row) => row.id === id);
+  if (!item || item.is_deleted) {
+    return;
+  }
+  openCategoryEdit(item, event);
+}
+
 async function saveCategory(): Promise<void> {
   const name = categoryForm.value.name.trim();
   if (name === "") {
@@ -550,23 +580,23 @@ async function saveCategory(): Promise<void> {
         ? await createCategory(name, categoryForm.value.color)
         : await updateCategory(categoryForm.value.id, name, categoryForm.value.color);
     if (result === "invalid") {
-      formError.value = "入力が不正です";
+      formError.value = "Invalid input";
       return;
     }
     if (result === "conflict") {
-      formError.value = "保存できませんでした";
+      formError.value = "Could not save";
       return;
     }
     if (result === "missing") {
-      formError.value = "対象がありません";
+      formError.value = "Not found";
       return;
     }
     categoryOpen.value = false;
-    flash("保存しました");
+    flash("Saved");
     categories.value = await getCategories(true);
   } catch (caught) {
     if (!handle(caught)) {
-      formError.value = "サーバエラーです";
+      formError.value = "Server error";
     }
   } finally {
     busy.value = false;
@@ -602,24 +632,24 @@ async function saveHoliday(): Promise<void> {
         ? await createUserHoliday(holidayForm.value.holiday_date, name)
         : await updateUserHoliday(holidayForm.value.id, holidayForm.value.holiday_date, name);
     if (result === "invalid") {
-      formError.value = "入力が不正です";
+      formError.value = "Invalid input";
       return;
     }
     if (result === "conflict") {
-      formError.value = "保存できませんでした";
+      formError.value = "Could not save";
       return;
     }
     if (result === "missing") {
-      formError.value = "対象がありません";
+      formError.value = "Not found";
       return;
     }
     holidayOpen.value = false;
-    flash("保存しました");
+    flash("Saved");
     allUserHolidays.value = await getAllUserHolidays();
     await loadMonth();
   } catch (caught) {
     if (!handle(caught)) {
-      formError.value = "サーバエラーです";
+      formError.value = "Server error";
     }
   } finally {
     busy.value = false;
@@ -646,14 +676,66 @@ const selectedTone = computed(() => {
   return dateTone(date.getDay(), isHoliday(selectedIso.value));
 });
 
+function syncMonthLinks(): void {
+  monthLinks.value = [-2, -1, 0, 1, 2].map((delta) => {
+    const next = addMonths(year.value, monthIndex.value, delta);
+    return {
+      year: next.year,
+      monthIndex: next.monthIndex,
+      label: monthLabelPadded(next.year, next.monthIndex),
+      current: delta === 0,
+    };
+  });
+}
+
+function syncCategoryNav(): void {
+  categoryNavShowDeleted.value = prefs.value.show_deleted;
+  categoryNavBusy.value = busy.value;
+  categoryNavItems.value = listedCategories.value.map((item) => ({
+    id: item.id,
+    name: item.name,
+    color: item.color,
+    isDeleted: item.is_deleted,
+    hidden: isHidden(item.id),
+  }));
+}
+
+watch([year, monthIndex], syncMonthLinks, { immediate: true });
+watch([listedCategories, prefs, busy], syncCategoryNav, { immediate: true });
+
 onMounted(async () => {
   media = window.matchMedia("(max-width: 767px)");
   onMedia();
   media.addEventListener("change", onMedia);
+  setMonthHandler(goToMonth);
+  setCategoryNavHandlers({
+    toggle: (id) => {
+      void toggleHiddenCategory(id);
+    },
+    edit: openCategoryEditById,
+    remove: (id) => {
+      askDelete("category", id);
+    },
+    add: openCategoryAdd,
+    toggleShowDeleted: () => {
+      void toggleShowDeleted();
+    },
+    openMobile: () => {
+      categoryPanel.value = true;
+    },
+  });
+  setHolidaySettingsHandler(() => {
+    holidayPanel.value = true;
+  });
   await loadAll();
 });
 
 onUnmounted(() => {
+  setMonthHandler(null);
+  setCategoryNavHandlers(null);
+  setHolidaySettingsHandler(null);
+  monthLinks.value = [];
+  categoryNavItems.value = [];
   media?.removeEventListener("change", onMedia);
   window.clearTimeout(successTimer);
 });
@@ -663,76 +745,24 @@ onUnmounted(() => {
   <div class="page">
     <p v-if="error" class="msg-error">{{ error }}</p>
     <p v-if="success" class="msg-success">{{ success }}</p>
-    <div v-if="busy && categories.length === 0 && schedules.length === 0" class="loading">読み込み中…</div>
+    <div v-if="!ready" class="loading">Loading…</div>
     <template v-else>
       <div class="toolbar">
         <h2 class="month-title">{{ titleText }}</h2>
-        <button class="btn-text" type="button" :disabled="busy" @click="shiftMonth(-1)">前月</button>
-        <button class="btn-text" type="button" :disabled="busy" @click="shiftMonth(1)">翌月</button>
-        <button class="btn-secondary" type="button" :disabled="busy" @click="goToday">今日</button>
+        <button class="btn-text" type="button" :disabled="busy" @click="shiftMonth(-1)">Prev</button>
+        <button class="btn-text" type="button" :disabled="busy" @click="shiftMonth(1)">Next</button>
+        <button class="btn-secondary" type="button" :disabled="busy" @click="goToday">Today</button>
         <select
           class="field week-select"
           :value="prefs.week_starts_on"
           :disabled="busy"
           @change="changeWeek(($event.target as HTMLSelectElement).value)"
         >
-          <option value="sunday">日曜始まり</option>
-          <option value="monday">月曜始まり</option>
+          <option value="sunday">Starts Sunday</option>
+          <option value="monday">Starts Monday</option>
         </select>
-        <button class="btn-secondary mobile-only" type="button" :disabled="busy" @click="categoryPanel = true">
-          カテゴリ
-        </button>
-        <button class="btn-secondary mobile-only" type="button" :disabled="busy" @click="holidayPanel = true">
-          休日
-        </button>
       </div>
       <div class="body">
-        <aside class="side pc-only">
-          <section class="panel-block">
-            <div class="section-head">
-              <h3>カテゴリ</h3>
-              <button class="btn-primary" type="button" :disabled="busy" @click="openCategoryAdd">新規</button>
-            </div>
-            <p v-if="listedCategories.length === 0" class="caption">データがありません</p>
-            <ul class="plain-list">
-              <li
-                v-for="item in listedCategories"
-                :key="item.id"
-                class="cat-row"
-                :class="{ muted: isHidden(item.id) }"
-                @click="toggleHiddenCategory(item.id)"
-              >
-                <span class="swatch" :style="{ background: item.color }"></span>
-                <span>{{ item.name }}{{ item.is_deleted ? "（削除済み）" : "" }}</span>
-                <span class="row-actions" v-if="!item.is_deleted">
-                  <button class="btn-text" type="button" @click="openCategoryEdit(item, $event)">編集</button>
-                  <button class="btn-text" type="button" @click.stop="askDelete('category', item.id)">削除</button>
-                </span>
-              </li>
-            </ul>
-            <button class="btn-text" type="button" :disabled="busy" @click="toggleShowDeleted">
-              {{ prefs.show_deleted ? "削除済みを隠す" : "削除済みを表示" }}
-            </button>
-          </section>
-          <section class="panel-block">
-            <div class="section-head">
-              <h3>休日</h3>
-              <button class="btn-primary" type="button" :disabled="busy" @click="openHolidayAdd">新規</button>
-            </div>
-            <p v-if="allUserHolidays.length === 0" class="caption">データがありません</p>
-            <ul class="plain-list">
-              <li
-                v-for="item in allUserHolidays"
-                :key="item.id"
-                class="cat-row"
-                @click="openHolidayEdit(item)"
-              >
-                <span>{{ item.holiday_date }} {{ item.name }}</span>
-                <button class="btn-text" type="button" @click.stop="askDelete('holiday', item.id)">削除</button>
-              </li>
-            </ul>
-          </section>
-        </aside>
         <section class="calendar-wrap">
           <div class="grid">
             <div
@@ -750,9 +780,11 @@ onUnmounted(() => {
               :class="{ 'out-month': !cell.inMonth, selected: selectedIso === cell.iso }"
               @click="onCellClick(cell.iso)"
             >
-              <div class="cell-date" :class="`tone-${tone(cell)}`">{{ Number(cell.iso.slice(8)) }}</div>
-              <div v-if="holidayNames(cell.iso).length" class="holiday-names caption">
-                {{ holidayNames(cell.iso).join(" ") }}
+              <div class="cell-head">
+                <div class="cell-date" :class="`tone-${tone(cell)}`">{{ Number(cell.iso.slice(8)) }}</div>
+                <div v-if="holidayNames(cell.iso).length" class="holiday-names">
+                  {{ holidayNames(cell.iso).join(" ") }}
+                </div>
               </div>
               <template v-if="!isMobile">
                 <button
@@ -815,7 +847,7 @@ onUnmounted(() => {
                 {{ holidayNames(selectedIso).join(" ") }}
               </span>
             </h3>
-            <p v-if="selectedDetail.length === 0" class="caption">データがありません</p>
+            <p v-if="selectedDetail.length === 0" class="caption">No data</p>
             <button
               v-for="item in selectedDetail"
               :key="item.id"
@@ -835,8 +867,8 @@ onUnmounted(() => {
 
     <div v-if="categoryPanel" class="overlay" @click.self="categoryPanel = false">
       <div class="modal">
-        <h2>カテゴリ</h2>
-        <p v-if="listedCategories.length === 0" class="caption">データがありません</p>
+        <h2>Categories</h2>
+        <p v-if="listedCategories.length === 0" class="caption">No data</p>
         <ul class="plain-list">
           <li
             v-for="item in listedCategories"
@@ -846,54 +878,54 @@ onUnmounted(() => {
             @click="toggleHiddenCategory(item.id)"
           >
             <span class="swatch" :style="{ background: item.color }"></span>
-            <span>{{ item.name }}{{ item.is_deleted ? "（削除済み）" : "" }}</span>
+            <span>{{ item.name }}{{ item.is_deleted ? " (deleted)" : "" }}</span>
             <span v-if="!item.is_deleted" class="row-actions">
-              <button class="btn-text" type="button" @click="openCategoryEdit(item, $event)">編集</button>
-              <button class="btn-text" type="button" @click.stop="askDelete('category', item.id)">削除</button>
+              <button class="btn-text" type="button" @click="openCategoryEdit(item, $event)">Edit</button>
+              <button class="btn-text" type="button" @click.stop="askDelete('category', item.id)">Delete</button>
             </span>
           </li>
         </ul>
         <button class="btn-text" type="button" :disabled="busy" @click="toggleShowDeleted">
-          {{ prefs.show_deleted ? "削除済みを隠す" : "削除済みを表示" }}
+          {{ prefs.show_deleted ? "Hide deleted" : "Show deleted" }}
         </button>
         <div class="modal-actions">
-          <button class="btn-primary" type="button" :disabled="busy" @click="openCategoryAdd">新規</button>
-          <button class="btn-secondary" type="button" @click="categoryPanel = false">閉じる</button>
+          <button class="btn-primary" type="button" :disabled="busy" @click="openCategoryAdd">New</button>
+          <button class="btn-secondary" type="button" @click="categoryPanel = false">Close</button>
         </div>
       </div>
     </div>
 
     <div v-if="holidayPanel" class="overlay" @click.self="holidayPanel = false">
       <div class="modal">
-        <h2>休日</h2>
-        <p v-if="allUserHolidays.length === 0" class="caption">データがありません</p>
+        <h2>Holidays</h2>
+        <p v-if="allUserHolidays.length === 0" class="caption">No data</p>
         <ul class="plain-list">
           <li v-for="item in allUserHolidays" :key="item.id" class="cat-row" @click="openHolidayEdit(item)">
             <span>{{ item.holiday_date }} {{ item.name }}</span>
-            <button class="btn-text" type="button" @click.stop="askDelete('holiday', item.id)">削除</button>
+            <button class="btn-text" type="button" @click.stop="askDelete('holiday', item.id)">Delete</button>
           </li>
         </ul>
         <div class="modal-actions">
-          <button class="btn-primary" type="button" :disabled="busy" @click="openHolidayAdd">新規</button>
-          <button class="btn-secondary" type="button" @click="holidayPanel = false">閉じる</button>
+          <button class="btn-primary" type="button" :disabled="busy" @click="openHolidayAdd">New</button>
+          <button class="btn-secondary" type="button" @click="holidayPanel = false">Close</button>
         </div>
       </div>
     </div>
 
     <div v-if="scheduleOpen" class="overlay" @click.self="scheduleOpen = false">
       <div class="modal">
-        <h2>{{ scheduleForm.id === null ? "新規" : "編集" }}</h2>
+        <h2>{{ scheduleForm.id === null ? "New" : "Edit" }}</h2>
         <p v-if="formError" class="msg-error">{{ formError }}</p>
         <div class="form-grid">
           <select v-model="scheduleForm.kind" class="field" :disabled="busy">
-            <option value="event">予定</option>
+            <option value="event">Event</option>
             <option value="todo">TODO</option>
           </select>
           <select v-model="scheduleForm.granularity" class="field" :disabled="busy">
-            <option value="day">日単位</option>
-            <option value="time">時間単位</option>
+            <option value="day">All-day</option>
+            <option value="time">Timed</option>
           </select>
-          <input v-model="scheduleForm.title" class="field" placeholder="タイトル" :disabled="busy" />
+          <input v-model="scheduleForm.title" class="field" placeholder="Title" :disabled="busy" />
           <input v-model="scheduleForm.start_date" class="field" type="date" :disabled="busy" />
           <input
             v-if="scheduleForm.granularity === 'time'"
@@ -911,26 +943,26 @@ onUnmounted(() => {
             :disabled="busy"
           />
           <select v-model="scheduleForm.category_id" class="field" :disabled="busy">
-            <option :value="null">カテゴリ</option>
+            <option :value="null">Category</option>
             <option v-for="item in activeCategories" :key="item.id" :value="item.id">
               {{ item.name }}
             </option>
           </select>
-          <input v-model="scheduleForm.location" class="field" placeholder="場所" :disabled="busy" />
-          <textarea v-model="scheduleForm.detail" class="field" placeholder="詳細" :disabled="busy"></textarea>
+          <input v-model="scheduleForm.location" class="field" placeholder="Location" :disabled="busy" />
+          <textarea v-model="scheduleForm.detail" class="field" placeholder="Details" :disabled="busy"></textarea>
           <select
             v-if="scheduleForm.id !== null && scheduleForm.kind === 'todo'"
             v-model="scheduleForm.is_completed"
             class="field"
             :disabled="busy"
           >
-            <option :value="false">未実施</option>
-            <option :value="true">実施済み</option>
+            <option :value="false">Open</option>
+            <option :value="true">Done</option>
           </select>
         </div>
         <div class="modal-actions">
-          <button class="btn-primary" type="button" :disabled="busy" @click="saveSchedule">保存</button>
-          <button class="btn-secondary" type="button" :disabled="busy" @click="scheduleOpen = false">キャンセル</button>
+          <button class="btn-primary" type="button" :disabled="busy" @click="saveSchedule">Save</button>
+          <button class="btn-secondary" type="button" :disabled="busy" @click="scheduleOpen = false">Cancel</button>
           <button
             v-if="scheduleForm.id !== null"
             class="btn-text"
@@ -938,7 +970,7 @@ onUnmounted(() => {
             :disabled="busy"
             @click="askDelete('schedule', scheduleForm.id)"
           >
-            削除
+            Delete
           </button>
         </div>
       </div>
@@ -946,30 +978,30 @@ onUnmounted(() => {
 
     <div v-if="categoryOpen" class="overlay" @click.self="categoryOpen = false">
       <div class="modal">
-        <h2>{{ categoryForm.id === null ? "新規" : "編集" }}</h2>
+        <h2>{{ categoryForm.id === null ? "New" : "Edit" }}</h2>
         <p v-if="formError" class="msg-error">{{ formError }}</p>
         <div class="form-grid">
-          <input v-model="categoryForm.name" class="field" placeholder="名称" :disabled="busy" />
+          <input v-model="categoryForm.name" class="field" placeholder="Name" :disabled="busy" />
           <input v-model="categoryForm.color" class="field" type="color" :disabled="busy" />
         </div>
         <div class="modal-actions">
-          <button class="btn-primary" type="button" :disabled="busy" @click="saveCategory">保存</button>
-          <button class="btn-secondary" type="button" :disabled="busy" @click="categoryOpen = false">キャンセル</button>
+          <button class="btn-primary" type="button" :disabled="busy" @click="saveCategory">Save</button>
+          <button class="btn-secondary" type="button" :disabled="busy" @click="categoryOpen = false">Cancel</button>
         </div>
       </div>
     </div>
 
     <div v-if="holidayOpen" class="overlay" @click.self="holidayOpen = false">
       <div class="modal">
-        <h2>{{ holidayForm.id === null ? "新規" : "編集" }}</h2>
+        <h2>{{ holidayForm.id === null ? "New" : "Edit" }}</h2>
         <p v-if="formError" class="msg-error">{{ formError }}</p>
         <div class="form-grid">
           <input v-model="holidayForm.holiday_date" class="field" type="date" :disabled="busy" />
-          <input v-model="holidayForm.name" class="field" placeholder="名称" :disabled="busy" />
+          <input v-model="holidayForm.name" class="field" placeholder="Name" :disabled="busy" />
         </div>
         <div class="modal-actions">
-          <button class="btn-primary" type="button" :disabled="busy" @click="saveHoliday">保存</button>
-          <button class="btn-secondary" type="button" :disabled="busy" @click="holidayOpen = false">キャンセル</button>
+          <button class="btn-primary" type="button" :disabled="busy" @click="saveHoliday">Save</button>
+          <button class="btn-secondary" type="button" :disabled="busy" @click="holidayOpen = false">Cancel</button>
           <button
             v-if="holidayForm.id !== null"
             class="btn-text"
@@ -977,7 +1009,7 @@ onUnmounted(() => {
             :disabled="busy"
             @click="askDelete('holiday', holidayForm.id)"
           >
-            削除
+            Delete
           </button>
         </div>
       </div>
@@ -985,11 +1017,11 @@ onUnmounted(() => {
 
     <div v-if="confirmKind" class="overlay">
       <div class="modal">
-        <h2>削除</h2>
-        <p>削除しますか？</p>
+        <h2>Delete</h2>
+        <p>Delete this?</p>
         <div class="modal-actions">
-          <button class="btn-primary" type="button" :disabled="busy" @click="confirmDelete">削除</button>
-          <button class="btn-secondary" type="button" :disabled="busy" @click="confirmKind = null">キャンセル</button>
+          <button class="btn-primary" type="button" :disabled="busy" @click="confirmDelete">Delete</button>
+          <button class="btn-secondary" type="button" :disabled="busy" @click="confirmKind = null">Cancel</button>
         </div>
       </div>
     </div>
@@ -1024,6 +1056,8 @@ onUnmounted(() => {
 .month-title {
   margin: 0;
   font-size: var(--font-size-title);
+  letter-spacing: 0.02em;
+  font-weight: 500;
 }
 
 .week-select {
@@ -1033,27 +1067,19 @@ onUnmounted(() => {
 
 .body {
   flex: 1;
-  display: grid;
-  grid-template-columns: 240px 1fr;
-  gap: calc(var(--space) * 2);
+  display: flex;
+  flex-direction: column;
   min-height: 0;
 }
 
-.side,
 .calendar-wrap,
 .detail,
 .plain-list {
   min-height: 0;
 }
 
-.side {
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--space) * 3);
-}
-
 .calendar-wrap {
+  flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -1078,6 +1104,9 @@ onUnmounted(() => {
 .weekday {
   background: var(--color-surface);
   text-align: center;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
 }
 
 .cell {
@@ -1094,14 +1123,26 @@ onUnmounted(() => {
   box-shadow: inset 0 0 0 1px var(--color-primary);
 }
 
+.cell-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space);
+}
+
 .cell-date {
   font-weight: 600;
+  flex: none;
 }
 
 .holiday-names {
+  color: var(--color-danger);
+  font-size: 14px;
+  text-align: right;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .item-row {
@@ -1220,23 +1261,7 @@ onUnmounted(() => {
   color: var(--color-danger);
 }
 
-.mobile-only {
-  display: none;
-}
-
 @media (max-width: 767px) {
-  .pc-only {
-    display: none;
-  }
-
-  .mobile-only {
-    display: inline-flex;
-  }
-
-  .body {
-    grid-template-columns: 1fr;
-  }
-
   .fab {
     bottom: calc(var(--space) * 2);
   }

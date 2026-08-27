@@ -18,7 +18,7 @@ from app.routers.user_holidays import router as user_holiday_router
 def create_app() -> FastAPI:
     cfg = load_config()
     setup_logging()
-    app = FastAPI(title="schedule")
+    app = FastAPI(title="schedule", redirect_slashes=False)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cfg.cors_origins,
