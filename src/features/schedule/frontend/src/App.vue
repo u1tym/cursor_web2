@@ -2,6 +2,7 @@
 import { onMounted, ref } from "vue";
 import { RouterView } from "vue-router";
 import { AuthError, getSettings, type Settings } from "./api";
+import iconSettings from "./assets/icon-settings.png";
 import {
   addCategoryNav,
   categoryNavBusy,
@@ -73,7 +74,10 @@ onMounted(async () => {
         Back
       </button>
       <h1 class="header-title">Schedule</h1>
-      <button class="btn-text" type="button" @click="openHolidaySettings">Settings</button>
+      <button class="btn-text" type="button" @click="openHolidaySettings">
+        <img class="header-icon" :src="iconSettings" alt="" />
+        Settings
+      </button>
       <img v-if="settings.icon_system" class="header-icon" :src="settings.icon_system" alt="" />
     </header>
     <nav class="nav" aria-label="Navigation">

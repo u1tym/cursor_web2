@@ -6,6 +6,11 @@ declare module "*.vue" {
   export default component;
 }
 
+declare module "*.png" {
+  const src: string;
+  export default src;
+}
+
 interface ImportMetaEnv {
   readonly VITE_API_SCHEDULE_URL: string;
 }
