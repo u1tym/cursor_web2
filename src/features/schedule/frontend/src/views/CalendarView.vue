@@ -38,6 +38,15 @@ import {
   type DayCell,
 } from "../calendar";
 import { setHolidaySettingsHandler } from "../holiday-settings";
+import iconEdit from "../assets/icon-edit.png";
+import iconLeft from "../assets/icon-left.png";
+import iconRight from "../assets/icon-right.png";
+import iconTrash from "../assets/icon-trash.png";
+import {
+  calendarNavBusy,
+  setCalendarNavHandlers,
+  weekStartsOn,
+} from "../calendar-nav";
 import { monthLinks, setMonthHandler } from "../month-nav";
 import {
   categoryNavBusy,
@@ -125,6 +134,7 @@ function handle(errorValue: unknown): boolean {
 const cells = computed(() => monthCells(year.value, monthIndex.value, prefs.value.week_starts_on));
 const headers = computed(() => weekdayHeaders(prefs.value.week_starts_on));
 const titleText = computed(() => monthLabel(year.value, monthIndex.value));
+const todayIso = computed(() => toIso(new Date()));
 const rangeStart = computed(() => cells.value[0]?.iso ?? "");
 const rangeEnd = computed(() => cells.value[cells.value.length - 1]?.iso ?? "");
 
@@ -251,6 +261,9 @@ async function persistPrefs(next: Preferences): Promise<void> {
 
 async function changeWeek(value: string): Promise<void> {
   if (value !== "sunday" && value !== "monday") {
+    return;
+  }
+  if (value === prefs.value.week_starts_on) {
     return;
   }
   busy.value = true;
@@ -700,14 +713,26 @@ function syncCategoryNav(): void {
   }));
 }
 
+function syncCalendarNav(): void {
+  weekStartsOn.value = prefs.value.week_starts_on;
+  calendarNavBusy.value = busy.value;
+}
+
 watch([year, monthIndex], syncMonthLinks, { immediate: true });
 watch([listedCategories, prefs, busy], syncCategoryNav, { immediate: true });
+watch([prefs, busy], syncCalendarNav, { immediate: true });
 
 onMounted(async () => {
   media = window.matchMedia("(max-width: 767px)");
   onMedia();
   media.addEventListener("change", onMedia);
   setMonthHandler(goToMonth);
+  setCalendarNavHandlers({
+    goToday,
+    changeWeek: (value) => {
+      void changeWeek(value);
+    },
+  });
   setCategoryNavHandlers({
     toggle: (id) => {
       void toggleHiddenCategory(id);
@@ -732,6 +757,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   setMonthHandler(null);
+  setCalendarNavHandlers(null);
   setCategoryNavHandlers(null);
   setHolidaySettingsHandler(null);
   monthLinks.value = [];
@@ -748,19 +774,13 @@ onUnmounted(() => {
     <div v-if="!ready" class="loading">Loading…</div>
     <template v-else>
       <div class="toolbar">
+        <button class="btn-text btn-icon" type="button" aria-label="Prev" :disabled="busy" @click="shiftMonth(-1)">
+          <img class="month-nav-icon" :src="iconLeft" alt="" />
+        </button>
         <h2 class="month-title">{{ titleText }}</h2>
-        <button class="btn-text" type="button" :disabled="busy" @click="shiftMonth(-1)">Prev</button>
-        <button class="btn-text" type="button" :disabled="busy" @click="shiftMonth(1)">Next</button>
-        <button class="btn-secondary" type="button" :disabled="busy" @click="goToday">Today</button>
-        <select
-          class="field week-select"
-          :value="prefs.week_starts_on"
-          :disabled="busy"
-          @change="changeWeek(($event.target as HTMLSelectElement).value)"
-        >
-          <option value="sunday">Starts Sunday</option>
-          <option value="monday">Starts Monday</option>
-        </select>
+        <button class="btn-text btn-icon" type="button" aria-label="Next" :disabled="busy" @click="shiftMonth(1)">
+          <img class="month-nav-icon" :src="iconRight" alt="" />
+        </button>
       </div>
       <div class="body">
         <section class="calendar-wrap">
@@ -777,11 +797,17 @@ onUnmounted(() => {
               v-for="cell in cells"
               :key="cell.iso"
               class="cell"
-              :class="{ 'out-month': !cell.inMonth, selected: selectedIso === cell.iso }"
+              :class="{
+                'out-month': !cell.inMonth,
+                selected: selectedIso === cell.iso,
+                'is-today': cell.iso === todayIso,
+              }"
               @click="onCellClick(cell.iso)"
             >
               <div class="cell-head">
-                <div class="cell-date" :class="`tone-${tone(cell)}`">{{ Number(cell.iso.slice(8)) }}</div>
+                <div class="cell-date" :class="`tone-${tone(cell)}`">
+                  {{ Number(cell.iso.slice(8)) }}
+                </div>
                 <div v-if="holidayNames(cell.iso).length" class="holiday-names">
                   {{ holidayNames(cell.iso).join(" ") }}
                 </div>
@@ -880,8 +906,22 @@ onUnmounted(() => {
             <span class="swatch" :style="{ background: item.color }"></span>
             <span>{{ item.name }}{{ item.is_deleted ? " (deleted)" : "" }}</span>
             <span v-if="!item.is_deleted" class="row-actions">
-              <button class="btn-text" type="button" @click="openCategoryEdit(item, $event)">Edit</button>
-              <button class="btn-text" type="button" @click.stop="askDelete('category', item.id)">Delete</button>
+              <button
+                class="btn-text btn-icon-sm"
+                type="button"
+                aria-label="Edit"
+                @click="openCategoryEdit(item, $event)"
+              >
+                <img class="row-icon" :src="iconEdit" alt="" />
+              </button>
+              <button
+                class="btn-text btn-icon-sm"
+                type="button"
+                aria-label="Delete"
+                @click.stop="askDelete('category', item.id)"
+              >
+                <img class="row-icon" :src="iconTrash" alt="" />
+              </button>
             </span>
           </li>
         </ul>
@@ -1047,10 +1087,17 @@ onUnmounted(() => {
 
 .toolbar {
   display: flex;
-  flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
   gap: var(--space);
   margin-bottom: calc(var(--space) * 2);
+}
+
+.toolbar .btn-icon {
+  width: var(--tap);
+  min-width: var(--tap);
+  padding: 0;
+  justify-content: center;
 }
 
 .month-title {
@@ -1058,11 +1105,14 @@ onUnmounted(() => {
   font-size: var(--font-size-title);
   letter-spacing: 0.02em;
   font-weight: 500;
+  text-align: center;
+  min-width: 12ch;
 }
 
-.week-select {
-  width: auto;
-  min-width: 160px;
+.month-nav-icon {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
 }
 
 .body {
@@ -1123,6 +1173,14 @@ onUnmounted(() => {
   box-shadow: inset 0 0 0 1px var(--color-primary);
 }
 
+.cell.is-today {
+  box-shadow: inset 0 0 0 2px var(--color-primary);
+}
+
+.cell.is-today.selected {
+  box-shadow: inset 0 0 0 2px var(--color-primary);
+}
+
 .cell-head {
   display: flex;
   align-items: baseline;
@@ -1137,7 +1195,7 @@ onUnmounted(() => {
 
 .holiday-names {
   color: var(--color-danger);
-  font-size: 14px;
+  font-size: 12px;
   text-align: right;
   white-space: nowrap;
   overflow: hidden;
@@ -1244,6 +1302,12 @@ onUnmounted(() => {
 .row-actions {
   margin-left: auto;
   display: flex;
+}
+
+.row-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
 }
 
 .swatch {

@@ -2,7 +2,15 @@
 import { onMounted, ref } from "vue";
 import { RouterView } from "vue-router";
 import { AuthError, getSettings, type Settings } from "./api";
+import iconEdit from "./assets/icon-edit.png";
 import iconSettings from "./assets/icon-settings.png";
+import iconTrash from "./assets/icon-trash.png";
+import {
+  calendarNavBusy,
+  changeWeekNav,
+  goTodayNav,
+  weekStartsOn,
+} from "./calendar-nav";
 import {
   addCategoryNav,
   categoryNavBusy,
@@ -74,11 +82,10 @@ onMounted(async () => {
         Back
       </button>
       <h1 class="header-title">Schedule</h1>
-      <button class="btn-text" type="button" @click="openHolidaySettings">
-        <img class="header-icon" :src="iconSettings" alt="" />
-        Settings
-      </button>
       <img v-if="settings.icon_system" class="header-icon" :src="settings.icon_system" alt="" />
+      <button class="btn-text btn-icon" type="button" aria-label="Settings" @click="openHolidaySettings">
+        <img class="header-icon header-icon-lg" :src="iconSettings" alt="" />
+      </button>
     </header>
     <nav class="nav" aria-label="Navigation">
       <div class="nav-top">
@@ -104,6 +111,36 @@ onMounted(async () => {
           {{ item.label }}
         </button>
       </div>
+      <div class="nav-calendar-controls">
+        <button
+          class="btn-secondary nav-today"
+          type="button"
+          :disabled="calendarNavBusy"
+          @click="goTodayNav"
+        >
+          Today
+        </button>
+        <div class="nav-week">
+          <button
+            class="nav-week-btn"
+            :class="{ 'is-current': weekStartsOn === 'sunday' }"
+            type="button"
+            :disabled="calendarNavBusy"
+            @click="changeWeekNav('sunday')"
+          >
+            Starts Sunday
+          </button>
+          <button
+            class="nav-week-btn"
+            :class="{ 'is-current': weekStartsOn === 'monday' }"
+            type="button"
+            :disabled="calendarNavBusy"
+            @click="changeWeekNav('monday')"
+          >
+            Starts Monday
+          </button>
+        </div>
+      </div>
       <section class="nav-categories pc-only">
         <div class="nav-cat-head">
           <h2>Categories</h2>
@@ -123,11 +160,21 @@ onMounted(async () => {
             <span class="swatch" :style="{ background: item.color }"></span>
             <span class="nav-cat-name">{{ item.name }}{{ item.isDeleted ? " (deleted)" : "" }}</span>
             <span v-if="!item.isDeleted" class="row-actions">
-              <button class="btn-text" type="button" @click.stop="editCategoryNav(item.id, $event)">
-                Edit
+              <button
+                class="btn-text btn-icon-sm"
+                type="button"
+                aria-label="Edit"
+                @click.stop="editCategoryNav(item.id, $event)"
+              >
+                <img class="row-icon" :src="iconEdit" alt="" />
               </button>
-              <button class="btn-text" type="button" @click.stop="removeCategoryNav(item.id)">
-                Delete
+              <button
+                class="btn-text btn-icon-sm"
+                type="button"
+                aria-label="Delete"
+                @click.stop="removeCategoryNav(item.id)"
+              >
+                <img class="row-icon" :src="iconTrash" alt="" />
               </button>
             </span>
           </li>
