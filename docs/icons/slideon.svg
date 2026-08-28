@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="#00ffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <defs>
+    <filter id="glow-on" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <g filter="url(#glow-on)">
+    <rect x="2" y="7" width="20" height="10" rx="5" stroke="#00ffff" stroke-width="1.5" fill="rgba(0, 255, 255, 0.15)" />
+    <circle cx="17" cy="12" r="3.5" fill="#00ffff" />
+  </g>
+</svg>
