@@ -124,8 +124,8 @@ erDiagram
 
 | key | 使う列 | 内容 |
 |-----|--------|------|
-| `login_url` | `value_text` | ログイン画面の URL（パス `/login` に対応） |
-| `menu_url` | `value_text` | メニュー画面の URL（パス `/menu` に対応） |
+| `login_url` | `value_text` | ログイン画面の URL（パス `/portal/login` に対応） |
+| `menu_url` | `value_text` | メニュー画面の URL（パス `/portal/menu` に対応） |
 | `icon_system` | `value_bytes` + `value_media_type` | システム全体を表すアイコン |
 | `icon_settings` | `value_bytes` + `value_media_type` | 設定アイコン |
 | `icon_back` | `value_bytes` + `value_media_type` | 戻るアイコン |
@@ -218,7 +218,7 @@ URL のホストは環境に合わせて登録する。アイコンは画像の�
 
 ## 承認
 
-現在の状態: 承認済み
+現在の状態: 未承認
 
 | 日時 | 状態 | 変更概要 |
 |------|------|----------|
@@ -227,3 +227,4 @@ URL のホストは環境に合わせて登録する。アイコンは画像の�
 | 2026-08-26 08:47 | 承認済み | メディアタイプ列を含む DB 設計を承認 |
 | 2026-08-26 23:40 | 未承認 | 機能アイコンを空（なし）にできるようにする |
 | 2026-08-26 23:45 | 承認済み | 機能アイコンなしを承認 |
+| 2026-08-29 17:15 | 未承認 | 初期 URL を `/portal/login` と `/portal/menu` に合わせる |

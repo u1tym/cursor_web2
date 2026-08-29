@@ -60,8 +60,8 @@ CREATE INDEX IF NOT EXISTS menu_assignments_user_order_idx
 -- 1x1 PNG
 INSERT INTO public.system_settings (key, value_text, value_bytes, value_media_type)
 VALUES
-    ('login_url', 'http://localhost:5173/login', NULL, NULL),
-    ('menu_url', 'http://localhost:5173/menu', NULL, NULL),
+    ('login_url', 'http://localhost:5173/portal/login', NULL, NULL),
+    ('menu_url', 'http://localhost:5173/portal/menu', NULL, NULL),
     (
         'icon_system',
         NULL,

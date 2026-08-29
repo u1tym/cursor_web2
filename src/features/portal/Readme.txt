@@ -40,10 +40,15 @@ portal（ログインとメニュー）
   cd src\features\portal\frontend
   npm run dev
 
-画面: http://localhost:5173
+画面: http://localhost:5173/portal/
 API:  http://localhost:8000
-ログイン画面: http://localhost:5173/login
-メニュー画面: http://localhost:5173/menu
+ログイン画面: http://localhost:5173/portal/login
+メニュー画面: http://localhost:5173/portal/menu
+
+nginx で出すときは、`npm run build` の dist をドキュメントルートの portal/ に置く
+（portal/login/ には置かない）。設定例は frontend/nginx.example.conf。
+既存 DB の login_url / menu_url が古いパスのときは、システム設定を
+  http://<ホスト>/portal/login と http://<ホスト>/portal/menu に合わせる。
 
 
 2. 運用コマンド
