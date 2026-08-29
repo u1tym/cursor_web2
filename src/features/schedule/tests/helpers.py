@@ -56,7 +56,7 @@ def ensure_feature() -> None:
                 INSERT INTO public.features (id, title, url, icon, icon_media_type)
                 VALUES (%s, %s, %s, %s, %s)
                 """,
-                ("schedule", "カレンダー", "http://localhost:5175/", PNG_1X1, "image/png"),
+                ("schedule", "カレンダー", "http://localhost:5175/portal_schedule/", PNG_1X1, "image/png"),
             )
 
 

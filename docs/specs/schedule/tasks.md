@@ -402,7 +402,7 @@ GET は行が無ければ初期値（日曜始まり、削除済みを出さな�
 
 ### 内容
 
-`npm run dev` で起動する。トークンと殻（ヘッダ / ナビ / コンテンツ。PC は左ナビ、スマートフォンは下ナビ）を `15-ui-style.mdc` どおりに置く。`--color-primary` は `#4DA3FF`。ナビは「カレンダー」のみ。ヘッダに戻るとシステムアイコン。パスは `/`。未ログインは GET `/settings` の login_url へ。割当なしは「この機能を使えません」。API は `VITE_API_SCHEDULE_URL` と credentials のみ。セッション ID をフロントに持たない。他機能の Vue は import しない。
+`npm run dev` で起動する。トークンと殻（ヘッダ / ナビ / コンテンツ。PC は左ナビ、スマートフォンは下ナビ）を `15-ui-style.mdc` どおりに置く。`--color-primary` は `#4DA3FF`。ナビは「カレンダー」のみ。ヘッダに戻るとシステムアイコン。Vite `base` は `/portal_schedule/`。パスは `/portal_schedule/`。未ログインは GET `/settings` の login_url へ。割当なしは「この機能を使えません」。API は `VITE_API_SCHEDULE_URL` と credentials のみ。セッション ID をフロントに持たない。他機能の Vue は import しない。
 
 ### 完了条件
 
@@ -621,3 +621,5 @@ GET は行が無ければ初期値（日曜始まり、削除済みを出さな�
 | 2026-08-27 22:03 | 承認済み | 初版を承認 |
 | 2026-08-29 09:37 | 未承認 | Today ボタン削除に合わせて完了条件を更新 |
 | 2026-08-29 11:25 | 承認済み | Today ボタン削除に合わせた完了条件の更新を承認 |
+| 2026-08-29 19:12 | 未承認 | 公開パスの基点を `/portal_schedule/` にする |
+| 2026-08-29 19:19 | 承認済み | 公開パス `/portal_schedule/` の改訂を承認 |
