@@ -2130,7 +2130,7 @@ onUnmounted(() => {
   min-width: 0;
   text-align: left;
   border: 0;
-  border-radius: var(--radius);
+  border-radius: 2px;
   padding: 2px var(--space);
   min-height: 22px;
   font-size: 14px;
