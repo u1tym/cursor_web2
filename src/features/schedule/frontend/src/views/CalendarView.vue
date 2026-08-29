@@ -45,7 +45,6 @@ import iconTrash from "../assets/icon-trash.png";
 import {
   calendarNavBusy,
   setCalendarNavHandlers,
-  weekStartsOn,
 } from "../calendar-nav";
 import { monthLinks, setMonthHandler } from "../month-nav";
 import {
@@ -92,7 +91,7 @@ const formError = ref("");
 const scheduleForm = ref({
   id: null as number | null,
   kind: "event" as "event" | "todo",
-  granularity: "day" as "day" | "time",
+  granularity: "time" as "day" | "time",
   title: "",
   start_date: "",
   end_date: "",
@@ -349,12 +348,27 @@ async function reloadMonth(): Promise<void> {
   }
 }
 
+function openPicker(event: Event): void {
+  const input = event.currentTarget as HTMLInputElement;
+  if (input.disabled) {
+    return;
+  }
+  const picker = input as HTMLInputElement & { showPicker?: () => void };
+  if (typeof picker.showPicker === "function") {
+    try {
+      picker.showPicker();
+    } catch {
+      return;
+    }
+  }
+}
+
 function openAdd(iso: string): void {
   const first = activeCategories.value[0];
   scheduleForm.value = {
     id: null,
     kind: "event",
-    granularity: "day",
+    granularity: "time",
     title: "",
     start_date: iso,
     end_date: iso,
@@ -714,7 +728,6 @@ function syncCategoryNav(): void {
 }
 
 function syncCalendarNav(): void {
-  weekStartsOn.value = prefs.value.week_starts_on;
   calendarNavBusy.value = busy.value;
 }
 
@@ -729,9 +742,6 @@ onMounted(async () => {
   setMonthHandler(goToMonth);
   setCalendarNavHandlers({
     goToday,
-    changeWeek: (value) => {
-      void changeWeek(value);
-    },
   });
   setCategoryNavHandlers({
     toggle: (id) => {
@@ -891,7 +901,7 @@ onUnmounted(() => {
       <button v-if="isMobile" class="fab btn-primary" type="button" :disabled="busy" @click="openFab">＋</button>
     </template>
 
-    <div v-if="categoryPanel" class="overlay" @click.self="categoryPanel = false">
+    <div v-if="categoryPanel" class="overlay">
       <div class="modal">
         <h2>Categories</h2>
         <p v-if="listedCategories.length === 0" class="caption">No data</p>
@@ -935,9 +945,33 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="holidayPanel" class="overlay" @click.self="holidayPanel = false">
+    <div v-if="holidayPanel" class="overlay">
       <div class="modal">
-        <h2>Holidays</h2>
+        <h2>Settings</h2>
+        <div class="settings-week">
+          <p class="caption">Week starts</p>
+          <div class="settings-week-btns">
+            <button
+              class="btn-secondary"
+              :class="{ 'is-week-current': prefs.week_starts_on === 'sunday' }"
+              type="button"
+              :disabled="busy"
+              @click="changeWeek('sunday')"
+            >
+              Starts Sunday
+            </button>
+            <button
+              class="btn-secondary"
+              :class="{ 'is-week-current': prefs.week_starts_on === 'monday' }"
+              type="button"
+              :disabled="busy"
+              @click="changeWeek('monday')"
+            >
+              Starts Monday
+            </button>
+          </div>
+        </div>
+        <h3>Holidays</h3>
         <p v-if="allUserHolidays.length === 0" class="caption">No data</p>
         <ul class="plain-list">
           <li v-for="item in allUserHolidays" :key="item.id" class="cat-row" @click="openHolidayEdit(item)">
@@ -952,41 +986,65 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="scheduleOpen" class="overlay" @click.self="scheduleOpen = false">
-      <div class="modal">
+    <div v-if="scheduleOpen" class="overlay">
+      <div class="modal modal-wide">
         <h2>{{ scheduleForm.id === null ? "New" : "Edit" }}</h2>
         <p v-if="formError" class="msg-error">{{ formError }}</p>
         <div class="form-grid">
-          <select v-model="scheduleForm.kind" class="field" :disabled="busy">
-            <option value="event">Event</option>
-            <option value="todo">TODO</option>
-          </select>
-          <select v-model="scheduleForm.granularity" class="field" :disabled="busy">
-            <option value="day">All-day</option>
-            <option value="time">Timed</option>
-          </select>
           <input v-model="scheduleForm.title" class="field" placeholder="Title" :disabled="busy" />
-          <input v-model="scheduleForm.start_date" class="field" type="date" :disabled="busy" />
-          <input
-            v-if="scheduleForm.granularity === 'time'"
-            v-model="scheduleForm.start_time"
-            class="field"
-            type="time"
-            :disabled="busy"
-          />
-          <input v-model="scheduleForm.end_date" class="field" type="date" :disabled="busy" />
-          <input
-            v-if="scheduleForm.granularity === 'time'"
-            v-model="scheduleForm.end_time"
-            class="field"
-            type="time"
-            :disabled="busy"
-          />
+          <label class="check-row">
+            <input
+              type="checkbox"
+              :checked="scheduleForm.granularity === 'day'"
+              :disabled="busy"
+              @change="scheduleForm.granularity = ($event.target as HTMLInputElement).checked ? 'day' : 'time'"
+            />
+            All-day
+          </label>
+          <div class="range-row">
+            <div class="range-side">
+              <input
+                v-model="scheduleForm.start_date"
+                class="field field-date"
+                type="date"
+                :disabled="busy"
+                @click="openPicker"
+              />
+              <input
+                v-if="scheduleForm.granularity === 'time'"
+                v-model="scheduleForm.start_time"
+                class="field field-time"
+                type="time"
+                :disabled="busy"
+              />
+            </div>
+            <span class="range-sep">～</span>
+            <div class="range-side">
+              <input
+                v-model="scheduleForm.end_date"
+                class="field field-date"
+                type="date"
+                :disabled="busy"
+                @click="openPicker"
+              />
+              <input
+                v-if="scheduleForm.granularity === 'time'"
+                v-model="scheduleForm.end_time"
+                class="field field-time"
+                type="time"
+                :disabled="busy"
+              />
+            </div>
+          </div>
           <select v-model="scheduleForm.category_id" class="field" :disabled="busy">
             <option :value="null">Category</option>
             <option v-for="item in activeCategories" :key="item.id" :value="item.id">
               {{ item.name }}
             </option>
+          </select>
+          <select v-model="scheduleForm.kind" class="field" :disabled="busy">
+            <option value="event">Event</option>
+            <option value="todo">TODO</option>
           </select>
           <input v-model="scheduleForm.location" class="field" placeholder="Location" :disabled="busy" />
           <textarea v-model="scheduleForm.detail" class="field" placeholder="Details" :disabled="busy"></textarea>
@@ -1016,7 +1074,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="categoryOpen" class="overlay" @click.self="categoryOpen = false">
+    <div v-if="categoryOpen" class="overlay">
       <div class="modal">
         <h2>{{ categoryForm.id === null ? "New" : "Edit" }}</h2>
         <p v-if="formError" class="msg-error">{{ formError }}</p>
@@ -1031,7 +1089,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="holidayOpen" class="overlay" @click.self="holidayOpen = false">
+    <div v-if="holidayOpen" class="overlay">
       <div class="modal">
         <h2>{{ holidayForm.id === null ? "New" : "Edit" }}</h2>
         <p v-if="formError" class="msg-error">{{ formError }}</p>
@@ -1214,7 +1272,9 @@ onUnmounted(() => {
   border-left: 4px solid var(--color-primary);
   padding: 2px var(--space);
   color: var(--color-text);
-  min-height: 24px;
+  min-height: 22px;
+  font-size: 14px;
+  line-height: 1.2;
 }
 
 .item-row.done span {
@@ -1282,6 +1342,37 @@ onUnmounted(() => {
 .section-head h3,
 .detail h3 {
   margin: 0;
+}
+
+.modal h3 {
+  margin: 0 0 calc(var(--space) * 2);
+  font-size: var(--font-size);
+  font-weight: 500;
+}
+
+.settings-week {
+  margin-bottom: calc(var(--space) * 2);
+  padding-bottom: calc(var(--space) * 2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.settings-week .caption {
+  margin: 0 0 var(--space);
+}
+
+.settings-week-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space);
+}
+
+.settings-week-btns .btn-secondary {
+  flex: 1;
+}
+
+.is-week-current {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .plain-list {

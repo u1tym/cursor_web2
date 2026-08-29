@@ -2,14 +2,14 @@
 import { onMounted, ref } from "vue";
 import { RouterView } from "vue-router";
 import { AuthError, getSettings, type Settings } from "./api";
+import iconBack from "./assets/icon-back.png";
 import iconEdit from "./assets/icon-edit.png";
+import iconNew from "./assets/icon-new.png";
 import iconSettings from "./assets/icon-settings.png";
 import iconTrash from "./assets/icon-trash.png";
 import {
   calendarNavBusy,
-  changeWeekNav,
   goTodayNav,
-  weekStartsOn,
 } from "./calendar-nav";
 import {
   addCategoryNav,
@@ -61,7 +61,7 @@ onMounted(async () => {
   <div v-else-if="forbidden" class="shell">
     <header class="header">
       <button v-if="settings" class="btn-text" type="button" @click="goMenu">
-        <img v-if="settings.icon_back" class="header-icon" :src="settings.icon_back" alt="" />
+        <img class="header-icon" :src="iconBack" alt="" />
         Back
       </button>
       <h1 class="header-title">Schedule</h1>
@@ -78,7 +78,7 @@ onMounted(async () => {
   <div v-else-if="settings" class="shell">
     <header class="header">
       <button class="btn-text" type="button" @click="goMenu">
-        <img v-if="settings.icon_back" class="header-icon" :src="settings.icon_back" alt="" />
+        <img class="header-icon" :src="iconBack" alt="" />
         Back
       </button>
       <h1 class="header-title">Schedule</h1>
@@ -120,68 +120,56 @@ onMounted(async () => {
         >
           Today
         </button>
-        <div class="nav-week">
-          <button
-            class="nav-week-btn"
-            :class="{ 'is-current': weekStartsOn === 'sunday' }"
-            type="button"
-            :disabled="calendarNavBusy"
-            @click="changeWeekNav('sunday')"
-          >
-            Starts Sunday
-          </button>
-          <button
-            class="nav-week-btn"
-            :class="{ 'is-current': weekStartsOn === 'monday' }"
-            type="button"
-            :disabled="calendarNavBusy"
-            @click="changeWeekNav('monday')"
-          >
-            Starts Monday
-          </button>
-        </div>
       </div>
       <section class="nav-categories pc-only">
         <div class="nav-cat-head">
           <h2>Categories</h2>
-          <button class="btn-primary" type="button" :disabled="categoryNavBusy" @click="addCategoryNav">
-            New
+          <button
+            class="btn-text btn-icon"
+            type="button"
+            aria-label="New"
+            :disabled="categoryNavBusy"
+            @click="addCategoryNav"
+          >
+            <img class="header-icon" :src="iconNew" alt="" />
           </button>
         </div>
-        <p v-if="categoryNavItems.length === 0" class="caption">No data</p>
-        <ul class="plain-list">
-          <li
-            v-for="item in categoryNavItems"
-            :key="item.id"
-            class="nav-cat-row"
-            :class="{ muted: item.hidden }"
-            @click="toggleCategoryNav(item.id)"
-          >
-            <span class="swatch" :style="{ background: item.color }"></span>
-            <span class="nav-cat-name">{{ item.name }}{{ item.isDeleted ? " (deleted)" : "" }}</span>
-            <span v-if="!item.isDeleted" class="row-actions">
-              <button
-                class="btn-text btn-icon-sm"
-                type="button"
-                aria-label="Edit"
-                @click.stop="editCategoryNav(item.id, $event)"
-              >
-                <img class="row-icon" :src="iconEdit" alt="" />
-              </button>
-              <button
-                class="btn-text btn-icon-sm"
-                type="button"
-                aria-label="Delete"
-                @click.stop="removeCategoryNav(item.id)"
-              >
-                <img class="row-icon" :src="iconTrash" alt="" />
-              </button>
-            </span>
-          </li>
-        </ul>
-        <button class="btn-text" type="button" :disabled="categoryNavBusy" @click="toggleCategoryNavDeleted">
-          {{ categoryNavShowDeleted ? "Hide deleted" : "Show deleted" }}
-        </button>
+        <div class="nav-cat-body">
+          <p v-if="categoryNavItems.length === 0" class="caption">No data</p>
+          <ul class="plain-list">
+            <li
+              v-for="item in categoryNavItems"
+              :key="item.id"
+              class="nav-cat-row"
+              :class="{ muted: item.hidden }"
+              @click="toggleCategoryNav(item.id)"
+            >
+              <span class="swatch" :style="{ background: item.color }"></span>
+              <span class="nav-cat-name">{{ item.name }}{{ item.isDeleted ? " (deleted)" : "" }}</span>
+              <span v-if="!item.isDeleted" class="row-actions">
+                <button
+                  class="btn-text btn-icon-sm"
+                  type="button"
+                  aria-label="Edit"
+                  @click.stop="editCategoryNav(item.id, $event)"
+                >
+                  <img class="row-icon" :src="iconEdit" alt="" />
+                </button>
+                <button
+                  class="btn-text btn-icon-sm"
+                  type="button"
+                  aria-label="Delete"
+                  @click.stop="removeCategoryNav(item.id)"
+                >
+                  <img class="row-icon" :src="iconTrash" alt="" />
+                </button>
+              </span>
+            </li>
+          </ul>
+          <button class="btn-text" type="button" :disabled="categoryNavBusy" @click="toggleCategoryNavDeleted">
+            {{ categoryNavShowDeleted ? "Hide deleted" : "Show deleted" }}
+          </button>
+        </div>
       </section>
     </nav>
     <main class="content">
