@@ -285,13 +285,13 @@ Cookie `session_id` でログイン中ユーザを特定する。未ログイン
 
 ### 内容
 
-`npm run dev` で起動する。トークンと殻（ヘッダ / ナビ / コンテンツ。PC は左ナビ、スマートフォンは下ナビ）を `15-ui-style.mdc` どおりに置く。`--color-primary` は `#8B7CFF`。ナビはユーザ・機能・割当。ヘッダに戻るとシステムアイコン。`/` は `/users` へ。未ログインは GET `/settings` の login_url へ。割当なしは「この機能を使えません」。API は `VITE_API_USER_MANAGEMENT_URL` と credentials のみ。セッション ID をフロントに持たない。他機能の Vue は import しない。
+`npm run dev` で起動する。トークンと殻（ヘッダ / ナビ / コンテンツ。PC は左ナビ、スマートフォンは下ナビ）を `15-ui-style.mdc` どおりに置く。`--color-primary` は `#8B7CFF`。ナビはユーザ・機能・割当。ヘッダに戻るとシステムアイコン。Vite `base` は `/portal_user_management/`。`/portal_user_management/` は `/portal_user_management/users` へ。未ログインは GET `/settings` の login_url へ。割当なしは「この機能を使えません」。API は `VITE_API_USER_MANAGEMENT_URL` と credentials のみ。セッション ID をフロントに持たない。他機能の Vue は import しない。
 
 ### 完了条件
 
 - [ ] `npm run dev` で起動できる
 - [ ] `VITE_API_USER_MANAGEMENT_URL` で API を呼び、ホストを直書きしていない
-- [ ] `/` が `/users` へ進む
+- [ ] `/portal_user_management/` が `/portal_user_management/users` へ進む
 - [ ] 未ログインでログイン画面 URL へ進む
 - [ ] セッション ID を `localStorage` や URL に置いていない
 
@@ -423,9 +423,11 @@ Cookie `session_id` でログイン中ユーザを特定する。未ログイン
 
 ## 承認
 
-現在の状態: 承認済み
+現在の状態: 未承認
 
 | 日時 | 状態 | 変更概要 |
 |------|------|----------|
 | 2026-08-26 23:03 | 未承認 | 初版 |
 | 2026-08-26 23:11 | 承認済み | 初版を承認 |
+| 2026-08-29 18:21 | 未承認 | 公開パスの基点を `/portal_user_management/` にする |
+| 2026-08-29 18:29 | 未承認 | dist の配置先を `features/user-management/` にする |

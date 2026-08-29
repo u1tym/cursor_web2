@@ -45,11 +45,18 @@ user-management（ユーザ管理）
   cd src\features\user-management\frontend
   npm run dev
 
-画面: http://localhost:5174
+画面: http://localhost:5174/portal_user_management/
 API:  http://localhost:8001
-ユーザ画面: http://localhost:5174/users
-機能画面: http://localhost:5174/features
-割当画面: http://localhost:5174/assignments
+ユーザ画面: http://localhost:5174/portal_user_management/users
+機能画面: http://localhost:5174/portal_user_management/features
+割当画面: http://localhost:5174/portal_user_management/assignments
+
+nginx で出すときは、`npm run build` の dist をドキュメントルートの
+features/user-management/ に置く。公開 URL は /portal_user_management/ のまま
+（設定例は frontend/nginx.example.conf）。
+ブラウザで /features/user-management/ は開かない。
+機能マスタの遷移先 URL は公開パスに合わせる
+（本番例: https://<ホスト>/portal_user_management/users）。
 
 未ログインで画面を開くと、portal のログイン画面へ進む。
 本機能が割り当てられていないときは「この機能を使えません」と出す。
@@ -62,7 +69,7 @@ API:  http://localhost:8001
 
   cd src\features\portal\backend
   .\venv\Scripts\Activate.ps1
-  python -m app.cli feature add user-management ユーザ管理 http://localhost:5174/users
+  python -m app.cli feature add user-management ユーザ管理 http://localhost:5174/portal_user_management/users
   python -m app.cli menu assign <ユーザ名> user-management 1
 
 アイコンファイルは省略できる。指定するときはコマンド末尾に付ける。

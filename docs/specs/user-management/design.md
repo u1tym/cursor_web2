@@ -8,7 +8,7 @@
 
 ## 構成
 
-- フロントエンド: `src/features/user-management/frontend` で Vue を起動
+- フロントエンド: `src/features/user-management/frontend` で Vue を起動。Vite `base` は `/portal_user_management/`。nginx では dist をドキュメントルートの `features/user-management/` に置き、公開 URL `/portal_user_management/` へ対応付ける
 - バックエンド: `src/features/user-management/backend` の venv で uvicorn を起動
 - API 基点: フロントの `VITE_API_USER_MANAGEMENT_URL`
 - DB: 本機能の固有スキーマは作らない。ユーザ、セッション、システム設定、機能マスタ、メニュー割当はスキーマ `public` を直接読む・更新する。機能スキーマへ複製しない。DDL は持たない（表は `portal` が用意する）。詳細は `db-design.md`
@@ -29,11 +29,11 @@
 
 | 画面 | パス | 説明 |
 |------|------|------|
-| ユーザ | `/users` | ユーザの一覧、追加、更新、削除。 |
-| 機能 | `/features` | 機能の一覧、追加、更新、削除。 |
-| 割当 | `/assignments` | 割当の一覧、追加、解除。 |
+| ユーザ | `/portal_user_management/users` | ユーザの一覧、追加、更新、削除。 |
+| 機能 | `/portal_user_management/features` | 機能の一覧、追加、更新、削除。 |
+| 割当 | `/portal_user_management/assignments` | 割当の一覧、追加、解除。 |
 
-`/` はユーザ画面へ進む。未ログインはシステム設定のログイン画面 URL へ誘導する。戻る先はシステム設定のメニュー画面 URL とする。
+公開パスの基点は Vite `base`（`/portal_user_management/`）。Vue Router のルートは `/users`、`/features`、`/assignments`。`/portal_user_management/` はユーザ画面へ進む。未ログインはシステム設定のログイン画面 URL へ誘導する。戻る先はシステム設定のメニュー画面 URL とする。
 
 ### コンポーネント
 
@@ -170,9 +170,11 @@ Cookie ベースのセッション認証を用いる。ログイン API は持�
 
 ## 承認
 
-現在の状態: 承認済み
+現在の状態: 未承認
 
 | 日時 | 状態 | 変更概要 |
 |------|------|----------|
 | 2026-08-26 22:50 | 未承認 | 初版 |
 | 2026-08-26 22:54 | 承認済み | 初版を承認 |
+| 2026-08-29 18:21 | 未承認 | 公開パスの基点を `/portal_user_management/` にする（nginx デプロイ） |
+| 2026-08-29 18:29 | 未承認 | dist の配置先を `features/user-management/` にする（公開パスはそのまま） |

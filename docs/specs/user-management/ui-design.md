@@ -34,17 +34,17 @@
 
 | 画面ID | 画面名 | パス | 目的 | 対応 REQ |
 |--------|--------|------|------|----------|
-| SCR-001 | ユーザ | `/users` | ユーザの一覧、追加、更新、削除。 | REQ-001, REQ-002, REQ-003, REQ-004, REQ-005 |
-| SCR-002 | 機能 | `/features` | 機能の一覧、追加、更新、削除。 | REQ-001, REQ-006, REQ-007, REQ-008, REQ-009 |
-| SCR-003 | 割当 | `/assignments` | 割当の一覧、追加、解除。 | REQ-001, REQ-010, REQ-011, REQ-012 |
+| SCR-001 | ユーザ | `/portal_user_management/users` | ユーザの一覧、追加、更新、削除。 | REQ-001, REQ-002, REQ-003, REQ-004, REQ-005 |
+| SCR-002 | 機能 | `/portal_user_management/features` | 機能の一覧、追加、更新、削除。 | REQ-001, REQ-006, REQ-007, REQ-008, REQ-009 |
+| SCR-003 | 割当 | `/portal_user_management/assignments` | 割当の一覧、追加、解除。 | REQ-001, REQ-010, REQ-011, REQ-012 |
 
-パス `/` は画面を持たず、SCR-001 へ進む。
+パス `/portal_user_management/` は画面を持たず、SCR-001 へ進む。
 
 ## 画面詳細
 
 ### SCR-001 ユーザ
 
-- パス: `/users`
+- パス: `/portal_user_management/users`
 - 目的: 削除されていないユーザを一覧し、追加・更新・削除する。
 - 対応 REQ: REQ-001, REQ-002, REQ-003, REQ-004, REQ-005
 
@@ -106,7 +106,7 @@
 
 ### SCR-002 機能
 
-- パス: `/features`
+- パス: `/portal_user_management/features`
 - 目的: 削除されていない機能を一覧し、追加・更新・削除する。
 - 対応 REQ: REQ-001, REQ-006, REQ-007, REQ-008, REQ-009
 
@@ -171,7 +171,7 @@
 
 ### SCR-003 割当
 
-- パス: `/assignments`
+- パス: `/portal_user_management/assignments`
 - 目的: 未削除ユーザへの未削除機能の割当を一覧し、追加・解除する。
 - 対応 REQ: REQ-001, REQ-010, REQ-011, REQ-012
 
@@ -248,7 +248,7 @@ flowchart LR
 
 | 起点 | 操作 | 条件 | 行き先 |
 |------|------|------|--------|
-| `/` | 開く | なし | SCR-001 |
+| `/portal_user_management/` | 開く | なし | SCR-001 |
 | SCR-001 | ナビ「機能」 | なし | SCR-002 |
 | SCR-001 | ナビ「割当」 | なし | SCR-003 |
 | SCR-002 | ナビ「ユーザ」 | なし | SCR-001 |
@@ -285,9 +285,10 @@ flowchart LR
 
 ## 承認
 
-現在の状態: 承認済み
+現在の状態: 未承認
 
 | 日時 | 状態 | 変更概要 |
 |------|------|----------|
 | 2026-08-26 22:54 | 未承認 | 初版 |
 | 2026-08-26 22:57 | 承認済み | 初版を承認 |
+| 2026-08-29 18:21 | 未承認 | 公開パスを `/portal_user_management/` 配下にする |
