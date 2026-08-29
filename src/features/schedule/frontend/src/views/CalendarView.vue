@@ -8,7 +8,6 @@ import {
   deleteCategory,
   deleteSchedule,
   deleteUserHoliday,
-  getAllUserHolidays,
   getCategories,
   getHolidays,
   getPreferences,
@@ -18,7 +17,6 @@ import {
   updateCategory,
   updateCompletion,
   updateSchedule,
-  updateUserHoliday,
   type CategoryItem,
   type HolidayItem,
   type Preferences,
@@ -71,7 +69,10 @@ const leftoverPopStyle = ref<Record<string, string>>({});
 const gridEl = ref<HTMLElement | null>(null);
 const visibleByIso = ref<Record<string, number>>({});
 const categoryPanel = ref(false);
-const holidayPanel = ref(false);
+const settingsPanel = ref(false);
+const dayMenu = ref<{ iso: string; x: number; y: number } | null>(null);
+const dayMenuEl = ref<HTMLElement | null>(null);
+const dayMenuStyle = ref<Record<string, string>>({});
 
 const prefs = ref<Preferences>({
   week_starts_on: "sunday",
@@ -82,12 +83,11 @@ const categories = ref<CategoryItem[]>([]);
 const schedules = ref<ScheduleItem[]>([]);
 const nationalHolidays = ref<HolidayItem[]>([]);
 const userHolidays = ref<UserHolidayItem[]>([]);
-const allUserHolidays = ref<UserHolidayItem[]>([]);
 
 const scheduleOpen = ref(false);
 const categoryOpen = ref(false);
 const holidayOpen = ref(false);
-const confirmKind = ref<"schedule" | "category" | "holiday" | null>(null);
+const confirmKind = ref<"schedule" | "category" | null>(null);
 const confirmId = ref<number | null>(null);
 const formError = ref("");
 
@@ -106,7 +106,7 @@ const scheduleForm = ref({
   is_completed: false,
 });
 const categoryForm = ref({ id: null as number | null, name: "", color: "#4DA3FF" });
-const holidayForm = ref({ id: null as number | null, holiday_date: "", name: "" });
+const holidayForm = ref({ holiday_date: "", name: "" });
 
 let successTimer = 0;
 let leftoverHideTimer = 0;
@@ -295,6 +295,10 @@ function isHoliday(iso: string): boolean {
   return holidayNames(iso).length > 0;
 }
 
+function userHolidayOn(iso: string): UserHolidayItem | undefined {
+  return userHolidays.value.find((item) => item.holiday_date === iso);
+}
+
 function tone(cell: DayCell): "danger" | "primary" | "normal" {
   return dateTone(cell.weekday, isHoliday(cell.iso));
 }
@@ -453,14 +457,9 @@ async function loadAll(): Promise<void> {
   busy.value = true;
   error.value = "";
   try {
-    const [nextPrefs, nextCategories, nextHolidays] = await Promise.all([
-      getPreferences(),
-      getCategories(true),
-      getAllUserHolidays(),
-    ]);
+    const [nextPrefs, nextCategories] = await Promise.all([getPreferences(), getCategories(true)]);
     prefs.value = nextPrefs;
     categories.value = nextCategories;
-    allUserHolidays.value = nextHolidays;
     await loadMonth();
   } catch (caught) {
     if (!handle(caught)) {
@@ -632,6 +631,7 @@ function openEdit(item: ScheduleItem): void {
 
 function onCellClick(iso: string): void {
   closeLeftover();
+  closeDayMenu();
   if (isMobile.value) {
     selectedIso.value = iso;
     return;
@@ -748,7 +748,7 @@ async function toggleTodo(item: ScheduleItem, event: Event): Promise<void> {
   }
 }
 
-function askDelete(kind: "schedule" | "category" | "holiday", id: number): void {
+function askDelete(kind: "schedule" | "category", id: number): void {
   confirmKind.value = kind;
   confirmId.value = id;
 }
@@ -775,16 +775,6 @@ async function confirmDelete(): Promise<void> {
       } else {
         flash("Deleted");
         categories.value = await getCategories(true);
-        await loadMonth();
-      }
-    } else {
-      const result = await deleteUserHoliday(confirmId.value);
-      if (result === "missing") {
-        error.value = "Not found";
-      } else {
-        holidayOpen.value = false;
-        flash("Deleted");
-        allUserHolidays.value = await getAllUserHolidays();
         await loadMonth();
       }
     }
@@ -856,20 +846,93 @@ async function saveCategory(): Promise<void> {
   }
 }
 
-function openHolidayAdd(): void {
-  holidayForm.value = {
-    id: null,
-    holiday_date: selectedIso.value ?? `${year.value}-${String(monthIndex.value + 1).padStart(2, "0")}-01`,
-    name: "",
+function closeDayMenu(): void {
+  dayMenu.value = null;
+  dayMenuStyle.value = {};
+}
+
+function placeDayMenu(x: number, y: number): void {
+  const menu = dayMenuEl.value;
+  const width = menu?.offsetWidth ?? 180;
+  const height = menu?.offsetHeight ?? 44;
+  const left = Math.min(x, window.innerWidth - width - 8);
+  const top = Math.min(y, window.innerHeight - height - 8);
+  dayMenuStyle.value = {
+    left: `${Math.max(8, left)}px`,
+    top: `${Math.max(8, top)}px`,
   };
+}
+
+function onCellContextMenu(iso: string, event: MouseEvent): void {
+  event.preventDefault();
+  event.stopPropagation();
+  closeLeftover();
+  dayMenu.value = { iso, x: event.clientX, y: event.clientY };
+  void nextTick(() => {
+    placeDayMenu(event.clientX, event.clientY);
+  });
+}
+
+function onWindowCloseDayMenu(event: Event): void {
+  if (dayMenu.value === null) {
+    return;
+  }
+  const target = event.target;
+  if (target instanceof Node && dayMenuEl.value?.contains(target)) {
+    return;
+  }
+  const onCell = target instanceof Element && target.closest(".cell") !== null;
+  closeDayMenu();
+  if (event.type === "contextmenu" && onCell) {
+    return;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function onWindowKeydown(event: KeyboardEvent): void {
+  if (event.key === "Escape") {
+    closeDayMenu();
+  }
+}
+
+function openHolidayAdd(): void {
+  const iso = dayMenu.value?.iso;
+  closeDayMenu();
+  if (iso === undefined) {
+    return;
+  }
+  holidayForm.value = { holiday_date: iso, name: "" };
   formError.value = "";
   holidayOpen.value = true;
 }
 
-function openHolidayEdit(item: UserHolidayItem): void {
-  holidayForm.value = { id: item.id, holiday_date: item.holiday_date, name: item.name };
-  formError.value = "";
-  holidayOpen.value = true;
+async function removeHoliday(): Promise<void> {
+  const iso = dayMenu.value?.iso;
+  closeDayMenu();
+  if (iso === undefined) {
+    return;
+  }
+  const item = userHolidayOn(iso);
+  if (item === undefined) {
+    return;
+  }
+  busy.value = true;
+  try {
+    const result = await deleteUserHoliday(item.id);
+    if (result === "missing") {
+      error.value = "Not found";
+      return;
+    }
+    flash("Deleted");
+    await loadMonth();
+  } catch (caught) {
+    if (!handle(caught)) {
+      error.value = "Server error";
+    }
+  } finally {
+    busy.value = false;
+  }
 }
 
 async function saveHoliday(): Promise<void> {
@@ -880,10 +943,7 @@ async function saveHoliday(): Promise<void> {
   busy.value = true;
   formError.value = "";
   try {
-    const result =
-      holidayForm.value.id === null
-        ? await createUserHoliday(holidayForm.value.holiday_date, name)
-        : await updateUserHoliday(holidayForm.value.id, holidayForm.value.holiday_date, name);
+    const result = await createUserHoliday(holidayForm.value.holiday_date, name);
     if (result === "invalid") {
       formError.value = "Invalid input";
       return;
@@ -892,13 +952,8 @@ async function saveHoliday(): Promise<void> {
       formError.value = "Could not save";
       return;
     }
-    if (result === "missing") {
-      formError.value = "Not found";
-      return;
-    }
     holidayOpen.value = false;
     flash("Saved");
-    allUserHolidays.value = await getAllUserHolidays();
     await loadMonth();
   } catch (caught) {
     if (!handle(caught)) {
@@ -996,8 +1051,12 @@ onMounted(async () => {
   });
   setHolidaySettingsHandler(() => {
     closeLeftover();
-    holidayPanel.value = true;
+    closeDayMenu();
+    settingsPanel.value = true;
   });
+  window.addEventListener("click", onWindowCloseDayMenu, true);
+  window.addEventListener("contextmenu", onWindowCloseDayMenu, true);
+  window.addEventListener("keydown", onWindowKeydown);
   await loadAll();
 });
 
@@ -1008,6 +1067,9 @@ onUnmounted(() => {
   monthLinks.value = [];
   categoryNavItems.value = [];
   media?.removeEventListener("change", onMedia);
+  window.removeEventListener("click", onWindowCloseDayMenu, true);
+  window.removeEventListener("contextmenu", onWindowCloseDayMenu, true);
+  window.removeEventListener("keydown", onWindowKeydown);
   gridObserver?.disconnect();
   window.clearTimeout(successTimer);
   window.clearTimeout(leftoverHideTimer);
@@ -1060,6 +1122,7 @@ onUnmounted(() => {
                 'is-today': cell.iso === todayIso,
               }"
               @click="onCellClick(cell.iso)"
+              @contextmenu="onCellContextMenu(cell.iso, $event)"
             >
               <div class="cell-head">
                 <div class="cell-date" :class="`tone-${tone(cell)}`">
@@ -1139,12 +1202,44 @@ onUnmounted(() => {
 
     <Teleport to="body">
       <div
+        v-if="dayMenu"
+        ref="dayMenuEl"
+        class="day-menu"
+        :style="dayMenuStyle"
+        role="menu"
+        @contextmenu.prevent
+      >
+        <button
+          v-if="userHolidayOn(dayMenu.iso) === undefined"
+          class="day-menu-item"
+          type="button"
+          :disabled="busy"
+          role="menuitem"
+          @click.stop="openHolidayAdd"
+        >
+          Add as holiday
+        </button>
+        <button
+          v-else
+          class="day-menu-item"
+          type="button"
+          :disabled="busy"
+          role="menuitem"
+          @click.stop="removeHoliday"
+        >
+          Remove holiday
+        </button>
+      </div>
+    </Teleport>
+    <Teleport to="body">
+      <div
         v-if="leftoverIso && leftoverItems.length"
         ref="leftoverPopEl"
         class="leftover-pop"
         :style="leftoverPopStyle"
         @mouseenter="cancelCloseLeftover"
         @mouseleave="scheduleCloseLeftover"
+        @contextmenu.prevent
       >
         <button
           v-for="item in leftoverItems"
@@ -1211,7 +1306,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="holidayPanel" class="overlay">
+    <div v-if="settingsPanel" class="overlay">
       <div class="modal">
         <h2>Settings</h2>
         <div class="settings-week">
@@ -1237,17 +1332,8 @@ onUnmounted(() => {
             </button>
           </div>
         </div>
-        <h3>Holidays</h3>
-        <p v-if="allUserHolidays.length === 0" class="caption">No data</p>
-        <ul class="plain-list">
-          <li v-for="item in allUserHolidays" :key="item.id" class="cat-row" @click="openHolidayEdit(item)">
-            <span>{{ item.holiday_date }} {{ item.name }}</span>
-            <button class="btn-text" type="button" @click.stop="askDelete('holiday', item.id)">Delete</button>
-          </li>
-        </ul>
         <div class="modal-actions">
-          <button class="btn-primary" type="button" :disabled="busy" @click="openHolidayAdd">New</button>
-          <button class="btn-secondary" type="button" @click="holidayPanel = false">Close</button>
+          <button class="btn-secondary" type="button" @click="settingsPanel = false">Close</button>
         </div>
       </div>
     </div>
@@ -1357,24 +1443,15 @@ onUnmounted(() => {
 
     <div v-if="holidayOpen" class="overlay">
       <div class="modal">
-        <h2>{{ holidayForm.id === null ? "New" : "Edit" }}</h2>
+        <h2>Add holiday</h2>
         <p v-if="formError" class="msg-error">{{ formError }}</p>
         <div class="form-grid">
-          <input v-model="holidayForm.holiday_date" class="field" type="date" :disabled="busy" />
+          <p class="caption">{{ holidayForm.holiday_date }}</p>
           <input v-model="holidayForm.name" class="field" placeholder="Name" :disabled="busy" />
         </div>
         <div class="modal-actions">
           <button class="btn-primary" type="button" :disabled="busy" @click="saveHoliday">Save</button>
           <button class="btn-secondary" type="button" :disabled="busy" @click="holidayOpen = false">Cancel</button>
-          <button
-            v-if="holidayForm.id !== null"
-            class="btn-text"
-            type="button"
-            :disabled="busy"
-            @click="askDelete('holiday', holidayForm.id)"
-          >
-            Delete
-          </button>
         </div>
       </div>
     </div>
@@ -1499,6 +1576,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  user-select: none;
 }
 
 .cell.out-month {
@@ -1607,6 +1685,33 @@ onUnmounted(() => {
   z-index: 15;
 }
 
+.day-menu {
+  position: fixed;
+  z-index: 18;
+  min-width: 180px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space);
+}
+
+.day-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 var(--space);
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-text);
+  text-align: left;
+}
+
+.day-menu-item:hover:not(:disabled) {
+  color: var(--color-primary);
+}
+
 .status-line {
   flex: none;
   height: calc(var(--space) * 3);
@@ -1689,8 +1794,6 @@ onUnmounted(() => {
 
 .settings-week {
   margin-bottom: calc(var(--space) * 2);
-  padding-bottom: calc(var(--space) * 2);
-  border-bottom: 1px solid var(--color-border);
 }
 
 .settings-week .caption {
