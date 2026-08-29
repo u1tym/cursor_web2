@@ -6,3 +6,4 @@
 *.pyc
 .pytest_cache/
 **/backend/log/
+tsconfig.tsbuildinfo
