@@ -42,10 +42,6 @@ import iconEdit from "../assets/icon-edit.png";
 import iconLeft from "../assets/icon-left.png";
 import iconRight from "../assets/icon-right.png";
 import iconTrash from "../assets/icon-trash.png";
-import {
-  calendarNavBusy,
-  setCalendarNavHandlers,
-} from "../calendar-nav";
 import { monthLinks, setMonthHandler } from "../month-nav";
 import {
   categoryNavBusy,
@@ -315,16 +311,6 @@ function shiftMonth(delta: number): void {
   const next = addMonths(year.value, monthIndex.value, delta);
   year.value = next.year;
   monthIndex.value = next.monthIndex;
-  void reloadMonth();
-}
-
-function goToday(): void {
-  const now = new Date();
-  year.value = now.getFullYear();
-  monthIndex.value = now.getMonth();
-  if (isMobile.value) {
-    selectedIso.value = toIso(now);
-  }
   void reloadMonth();
 }
 
@@ -727,22 +713,14 @@ function syncCategoryNav(): void {
   }));
 }
 
-function syncCalendarNav(): void {
-  calendarNavBusy.value = busy.value;
-}
-
 watch([year, monthIndex], syncMonthLinks, { immediate: true });
 watch([listedCategories, prefs, busy], syncCategoryNav, { immediate: true });
-watch([prefs, busy], syncCalendarNav, { immediate: true });
 
 onMounted(async () => {
   media = window.matchMedia("(max-width: 767px)");
   onMedia();
   media.addEventListener("change", onMedia);
   setMonthHandler(goToMonth);
-  setCalendarNavHandlers({
-    goToday,
-  });
   setCategoryNavHandlers({
     toggle: (id) => {
       void toggleHiddenCategory(id);
@@ -767,7 +745,6 @@ onMounted(async () => {
 
 onUnmounted(() => {
   setMonthHandler(null);
-  setCalendarNavHandlers(null);
   setCategoryNavHandlers(null);
   setHolidaySettingsHandler(null);
   monthLinks.value = [];
@@ -794,6 +771,18 @@ onUnmounted(() => {
       </div>
       <div class="body">
         <section class="calendar-wrap">
+          <div v-if="isMobile" class="month-bar">
+            <button
+              v-for="item in monthLinks"
+              :key="`${item.year}-${item.monthIndex}`"
+              class="month-bar-item"
+              :class="{ 'is-current': item.current }"
+              type="button"
+              @click="goToMonth(item.year, item.monthIndex)"
+            >
+              {{ item.label }}
+            </button>
+          </div>
           <div class="grid">
             <div
               v-for="head in headers"
@@ -1173,6 +1162,10 @@ onUnmounted(() => {
   object-fit: contain;
 }
 
+.month-bar {
+  display: none;
+}
+
 .body {
   flex: 1;
   display: flex;
@@ -1417,6 +1410,62 @@ onUnmounted(() => {
 }
 
 @media (max-width: 767px) {
+  .page {
+    padding: var(--space);
+    padding-bottom: 0;
+  }
+
+  .toolbar {
+    margin-bottom: 0;
+  }
+
+  .month-bar {
+    display: flex;
+    flex: none;
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+    border-bottom: 0;
+    background: var(--color-surface);
+  }
+
+  .month-bar-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1 0 auto;
+    min-height: 28px;
+    padding: 0 var(--space);
+    border: 0;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: 14px;
+  }
+
+  .month-bar-item.is-current {
+    color: var(--color-primary);
+    box-shadow: inset 0 -3px 0 var(--color-primary);
+  }
+
+  .calendar-wrap {
+    flex: none;
+  }
+
+  .grid {
+    flex: none;
+    border-top: 0;
+    grid-template-rows: auto repeat(6, minmax(var(--tap), auto));
+  }
+
+  .cell {
+    min-height: var(--tap);
+  }
+
+  .detail {
+    flex: 1;
+    max-height: none;
+    margin-top: calc(var(--space) * 2);
+  }
+
   .fab {
     bottom: calc(var(--space) * 2);
   }

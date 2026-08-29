@@ -8,10 +8,6 @@ import iconNew from "./assets/icon-new.png";
 import iconSettings from "./assets/icon-settings.png";
 import iconTrash from "./assets/icon-trash.png";
 import {
-  calendarNavBusy,
-  goTodayNav,
-} from "./calendar-nav";
-import {
   addCategoryNav,
   categoryNavBusy,
   categoryNavItems,
@@ -99,7 +95,7 @@ onMounted(async () => {
           Categories
         </button>
       </div>
-      <div class="nav-months">
+      <div class="nav-months pc-only">
         <button
           v-for="item in monthLinks"
           :key="`${item.year}-${item.monthIndex}`"
@@ -109,16 +105,6 @@ onMounted(async () => {
           @click="selectMonth(item.year, item.monthIndex)"
         >
           {{ item.label }}
-        </button>
-      </div>
-      <div class="nav-calendar-controls">
-        <button
-          class="btn-secondary nav-today"
-          type="button"
-          :disabled="calendarNavBusy"
-          @click="goTodayNav"
-        >
-          Today
         </button>
       </div>
       <section class="nav-categories pc-only">
