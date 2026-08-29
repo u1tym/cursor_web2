@@ -61,11 +61,14 @@ export function weekdayHeaders(weekStartsOn: WeekStart): { label: string; kind: 
 
 export function monthCells(year: number, monthIndex: number, weekStartsOn: WeekStart): DayCell[] {
   const first = new Date(year, monthIndex, 1);
-  const dow = first.getDay();
-  const offset = weekStartsOn === "sunday" ? dow : (dow + 6) % 7;
+  const last = new Date(year, monthIndex + 1, 0);
+  const offset = weekStartsOn === "sunday" ? first.getDay() : (first.getDay() + 6) % 7;
   const start = new Date(year, monthIndex, 1 - offset);
+  const lastPos = weekStartsOn === "sunday" ? last.getDay() : (last.getDay() + 6) % 7;
+  const trailing = 6 - lastPos;
+  const total = offset + last.getDate() + trailing;
   const cells: DayCell[] = [];
-  for (let index = 0; index < 42; index += 1) {
+  for (let index = 0; index < total; index += 1) {
     const current = new Date(start);
     current.setDate(start.getDate() + index);
     cells.push({

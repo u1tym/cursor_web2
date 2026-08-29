@@ -245,6 +245,7 @@ function handle(errorValue: unknown): boolean {
 }
 
 const cells = computed(() => monthCells(year.value, monthIndex.value, prefs.value.week_starts_on));
+const weekRowCount = computed(() => Math.max(1, Math.round(cells.value.length / 7)));
 const headers = computed(() => weekdayHeaders(prefs.value.week_starts_on));
 const titleText = computed(() => monthLabel(year.value, monthIndex.value));
 const todayIso = computed(() => toIso(new Date()));
@@ -1040,7 +1041,7 @@ onUnmounted(() => {
               {{ item.label }}
             </button>
           </div>
-          <div ref="gridEl" class="grid">
+          <div ref="gridEl" class="grid" :style="{ '--week-rows': String(weekRowCount) }">
             <div
               v-for="head in headers"
               :key="head.label"
@@ -1464,7 +1465,7 @@ onUnmounted(() => {
   flex: 1;
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  grid-template-rows: auto repeat(6, minmax(0, 1fr));
+  grid-template-rows: auto repeat(var(--week-rows, 5), minmax(0, 1fr));
   border: 1px solid var(--color-border);
   min-height: 0;
 }
@@ -1777,7 +1778,7 @@ onUnmounted(() => {
   .grid {
     flex: none;
     border-top: 0;
-    grid-template-rows: auto repeat(6, minmax(var(--tap), auto));
+    grid-template-rows: auto repeat(var(--week-rows, 5), minmax(var(--tap), auto));
   }
 
   .cell {
