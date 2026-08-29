@@ -1117,18 +1117,20 @@ onUnmounted(() => {
                 {{ holidayNames(selectedIso).join(" ") }}
               </span>
             </h3>
-            <p v-if="selectedDetail.length === 0" class="caption">No data</p>
-            <button
-              v-for="item in selectedDetail"
-              :key="item.id"
-              class="item-row"
-              type="button"
-              :style="itemTone(item.category_id)"
-              :class="{ done: item.kind === 'todo' && item.is_completed }"
-              @click="openEdit(item)"
-            >
-              <span>{{ item.kind === "todo" ? "TODO " : "" }}{{ mobileLabel(item, selectedIso) }}</span>
-            </button>
+            <div class="detail-list">
+              <p v-if="selectedDetail.length === 0" class="caption">No data</p>
+              <button
+                v-for="item in selectedDetail"
+                :key="item.id"
+                class="item-row"
+                type="button"
+                :style="itemTone(item.category_id)"
+                :class="{ done: item.kind === 'todo' && item.is_completed }"
+                @click="openEdit(item)"
+              >
+                <span>{{ item.kind === "todo" ? "TODO " : "" }}{{ mobileLabel(item, selectedIso) }}</span>
+              </button>
+            </div>
           </div>
         </section>
       </div>
@@ -1392,11 +1394,13 @@ onUnmounted(() => {
 
 <style scoped>
 .page {
+  flex: 1;
   height: 100%;
   display: flex;
   flex-direction: column;
   padding: calc(var(--space) * 3);
   min-height: 0;
+  overflow: hidden;
   position: relative;
 }
 
@@ -1446,6 +1450,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 }
 
 .calendar-wrap,
@@ -1459,6 +1464,8 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .grid {
@@ -1631,11 +1638,22 @@ onUnmounted(() => {
 }
 
 .detail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   max-height: 36%;
-  overflow: auto;
+  overflow: hidden;
   margin-top: calc(var(--space) * 2);
   padding-top: var(--space);
   border-top: 1px solid var(--color-border);
+}
+
+.detail-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .fab {
@@ -1660,6 +1678,7 @@ onUnmounted(() => {
 .section-head h3,
 .detail h3 {
   margin: 0;
+  flex: none;
 }
 
 .modal h3 {
@@ -1771,10 +1790,6 @@ onUnmounted(() => {
     box-shadow: inset 0 -3px 0 var(--color-primary);
   }
 
-  .calendar-wrap {
-    flex: none;
-  }
-
   .grid {
     flex: none;
     border-top: 0;
@@ -1789,6 +1804,10 @@ onUnmounted(() => {
     flex: 1;
     max-height: none;
     margin-top: calc(var(--space) * 2);
+  }
+
+  .detail-list {
+    padding-bottom: calc(var(--tap) + var(--space) * 3);
   }
 
   .fab {
