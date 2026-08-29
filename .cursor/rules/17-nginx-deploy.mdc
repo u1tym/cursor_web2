@@ -32,7 +32,13 @@ base: "/feature_user_management/"
 
 `rewrite` は `last`。`break` と `try_files` を同じ location に置かない（JS/CSS が HTML になる）。`$uri/` は使わない。
 
+`location /portal_user_management/` は末尾 `/` 付きだけにマッチする。スラッシュなしは 301 で付ける。
+
 ```nginx
+location = /portal_user_management {
+    return 301 /portal_user_management/;
+}
+
 location /portal_user_management/ {
     rewrite ^/portal_user_management/(.*)$ /features/user-management/$1 last;
 }

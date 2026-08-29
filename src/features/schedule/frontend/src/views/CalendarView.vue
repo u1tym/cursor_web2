@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import {
   AuthError,
   createCategory,
@@ -52,7 +52,9 @@ import {
 
 const emit = defineEmits<{ "auth-error": [unknown] }>();
 
-const PC_VISIBLE = 3;
+const ITEM_ROW_PX = 24;
+const LEFTOVER_ROW_PX = 20;
+const LEFTOVER_HIDE_MS = 1000;
 
 const busy = ref(false);
 const ready = ref(false);
@@ -63,6 +65,11 @@ const year = ref(new Date().getFullYear());
 const monthIndex = ref(new Date().getMonth());
 const selectedIso = ref<string | null>(null);
 const leftoverIso = ref<string | null>(null);
+const leftoverAnchor = ref<HTMLElement | null>(null);
+const leftoverPopEl = ref<HTMLElement | null>(null);
+const leftoverPopStyle = ref<Record<string, string>>({});
+const gridEl = ref<HTMLElement | null>(null);
+const visibleByIso = ref<Record<string, number>>({});
 const categoryPanel = ref(false);
 const holidayPanel = ref(false);
 
@@ -102,6 +109,8 @@ const categoryForm = ref({ id: null as number | null, name: "", color: "#4DA3FF"
 const holidayForm = ref({ id: null as number | null, holiday_date: "", name: "" });
 
 let successTimer = 0;
+let leftoverHideTimer = 0;
+let gridObserver: ResizeObserver | null = null;
 let media: MediaQueryList | null = null;
 
 function onMedia(): void {
@@ -111,11 +120,120 @@ function onMedia(): void {
 }
 
 function flash(message: string): void {
+  error.value = "";
   success.value = message;
   window.clearTimeout(successTimer);
   successTimer = window.setTimeout(() => {
     success.value = "";
   }, 3000);
+}
+
+function closeLeftover(): void {
+  window.clearTimeout(leftoverHideTimer);
+  leftoverIso.value = null;
+  leftoverAnchor.value = null;
+  leftoverPopStyle.value = {};
+}
+
+function cancelCloseLeftover(): void {
+  window.clearTimeout(leftoverHideTimer);
+}
+
+function scheduleCloseLeftover(): void {
+  window.clearTimeout(leftoverHideTimer);
+  leftoverHideTimer = window.setTimeout(() => {
+    closeLeftover();
+  }, LEFTOVER_HIDE_MS);
+}
+
+function leftoverPopBox(
+  placeAbove: boolean,
+  maxHeight: number,
+  anchorRect: DOMRect,
+): Record<string, string> {
+  const popLeft = Math.min(
+    Math.max(8, anchorRect.right - 240),
+    window.innerWidth - 8 - 240,
+  );
+  if (placeAbove) {
+    return {
+      top: `${anchorRect.top - 4}px`,
+      left: `${popLeft}px`,
+      transform: "translateY(-100%)",
+      maxHeight: `${maxHeight}px`,
+    };
+  }
+  return {
+    top: `${anchorRect.bottom + 4}px`,
+    left: `${popLeft}px`,
+    transform: "none",
+    maxHeight: `${maxHeight}px`,
+  };
+}
+
+function positionLeftoverPop(measure: boolean): void {
+  const anchor = leftoverAnchor.value;
+  if (anchor === null) {
+    leftoverPopStyle.value = {};
+    return;
+  }
+  const rect = anchor.getBoundingClientRect();
+  if (!measure) {
+    leftoverPopStyle.value = {
+      ...leftoverPopBox(false, 240, rect),
+      visibility: "hidden",
+    };
+    return;
+  }
+  const spaceBelow = window.innerHeight - rect.bottom - 12;
+  const spaceAbove = rect.top - 12;
+  const pop = leftoverPopEl.value;
+  const contentHeight = pop ? pop.scrollHeight : 240;
+  const placeAbove = contentHeight > spaceBelow && spaceAbove > spaceBelow;
+  const available = placeAbove ? spaceAbove : spaceBelow;
+  leftoverPopStyle.value = leftoverPopBox(placeAbove, Math.max(48, Math.min(240, available)), rect);
+}
+
+async function onLeftoverClick(iso: string, event: MouseEvent): Promise<void> {
+  event.stopPropagation();
+  window.clearTimeout(leftoverHideTimer);
+  leftoverIso.value = iso;
+  leftoverAnchor.value = event.currentTarget as HTMLElement;
+  positionLeftoverPop(false);
+  await nextTick();
+  positionLeftoverPop(true);
+}
+
+function parseHexColor(value: string): [number, number, number] | null {
+  const hex = value.trim().replace("#", "");
+  if (/^[0-9a-fA-F]{3}$/.test(hex)) {
+    return [
+      Number.parseInt(hex[0] + hex[0], 16),
+      Number.parseInt(hex[1] + hex[1], 16),
+      Number.parseInt(hex[2] + hex[2], 16),
+    ];
+  }
+  if (/^[0-9a-fA-F]{6}$/.test(hex)) {
+    return [
+      Number.parseInt(hex.slice(0, 2), 16),
+      Number.parseInt(hex.slice(2, 4), 16),
+      Number.parseInt(hex.slice(4, 6), 16),
+    ];
+  }
+  return null;
+}
+
+function textOn(background: string): string {
+  const rgb = parseHexColor(background);
+  if (rgb === null) {
+    return "#e8f1ff";
+  }
+  const [r, g, b] = rgb.map((channel) => {
+    const s = channel / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance > 0.45 ? "#070b14" : "#e8f1ff";
 }
 
 function handle(errorValue: unknown): boolean {
@@ -184,6 +302,11 @@ function categoryColor(categoryId: number): string {
   return categories.value.find((item) => item.id === categoryId)?.color ?? "#4DA3FF";
 }
 
+function itemTone(categoryId: number): { backgroundColor: string; color: string } {
+  const backgroundColor = categoryColor(categoryId);
+  return { backgroundColor, color: textOn(backgroundColor) };
+}
+
 function pcLabel(item: ScheduleItem, iso: string): string {
   if (item.granularity === "time" && item.start_time && item.start_date === iso) {
     return `${item.start_time} ${item.title}`;
@@ -210,6 +333,120 @@ function dotsFor(iso: string): string[] {
   }
   return colors;
 }
+
+function dayVisibleCount(iso: string): number {
+  const total = daySchedules(iso).length;
+  const measured = visibleByIso.value[iso];
+  if (measured === undefined) {
+    return Math.min(3, total);
+  }
+  return Math.min(measured, total);
+}
+
+function dayLeftoverCount(iso: string): number {
+  return Math.max(0, daySchedules(iso).length - dayVisibleCount(iso));
+}
+
+function updateVisibleCounts(): void {
+  const grid = gridEl.value;
+  if (grid === null || isMobile.value) {
+    visibleByIso.value = {};
+    return;
+  }
+  const nodes = grid.querySelectorAll<HTMLElement>(".cell");
+  const dayCells = cells.value;
+  if (nodes.length !== dayCells.length) {
+    return;
+  }
+  const sample = grid.querySelector<HTMLElement>(".item-row");
+  let rowPx = ITEM_ROW_PX;
+  if (sample !== null) {
+    const style = window.getComputedStyle(sample);
+    rowPx = sample.offsetHeight + Number.parseFloat(style.marginTop);
+    if (!Number.isFinite(rowPx) || rowPx <= 0) {
+      rowPx = ITEM_ROW_PX;
+    }
+  }
+  const leftoverSample = grid.querySelector<HTMLElement>(".leftover");
+  let leftoverPx = LEFTOVER_ROW_PX;
+  if (leftoverSample !== null) {
+    const style = window.getComputedStyle(leftoverSample);
+    leftoverPx = leftoverSample.offsetHeight + Number.parseFloat(style.marginTop);
+    if (!Number.isFinite(leftoverPx) || leftoverPx <= 0) {
+      leftoverPx = LEFTOVER_ROW_PX;
+    }
+  }
+  const next: Record<string, number> = {};
+  for (let index = 0; index < dayCells.length; index += 1) {
+    const node = nodes[index];
+    const iso = dayCells[index].iso;
+    const head = node.querySelector<HTMLElement>(".cell-head");
+    const styles = window.getComputedStyle(node);
+    const padY = Number.parseFloat(styles.paddingTop) + Number.parseFloat(styles.paddingBottom);
+    const available = node.clientHeight - padY - (head?.offsetHeight ?? 0);
+    const total = daySchedules(iso).length;
+    if (total <= 0 || available <= 0) {
+      next[iso] = 0;
+      continue;
+    }
+    const withoutLeftover = Math.floor(available / rowPx);
+    if (total <= withoutLeftover) {
+      next[iso] = total;
+    } else {
+      next[iso] = Math.max(0, Math.floor((available - leftoverPx) / rowPx));
+    }
+  }
+  if (!visibleCountsEqual(visibleByIso.value, next)) {
+    visibleByIso.value = next;
+  }
+  void tightenIfClipped();
+}
+
+async function tightenIfClipped(): Promise<void> {
+  await nextTick();
+  const grid = gridEl.value;
+  if (grid === null || isMobile.value) {
+    return;
+  }
+  const nodes = grid.querySelectorAll<HTMLElement>(".cell");
+  const dayCells = cells.value;
+  if (nodes.length !== dayCells.length) {
+    return;
+  }
+  const adjusted = { ...visibleByIso.value };
+  let changed = false;
+  for (let index = 0; index < dayCells.length; index += 1) {
+    const itemsEl = nodes[index].querySelector<HTMLElement>(".cell-items");
+    const iso = dayCells[index].iso;
+    if (itemsEl === null) {
+      continue;
+    }
+    const shown = adjusted[iso] ?? 0;
+    if (shown > 0 && itemsEl.scrollHeight > itemsEl.clientHeight + 1) {
+      const reduce = Math.max(1, Math.ceil((itemsEl.scrollHeight - itemsEl.clientHeight) / ITEM_ROW_PX));
+      adjusted[iso] = Math.max(0, shown - reduce);
+      changed = true;
+    }
+  }
+  if (changed && !visibleCountsEqual(visibleByIso.value, adjusted)) {
+    visibleByIso.value = adjusted;
+  }
+}
+
+function visibleCountsEqual(left: Record<string, number>, right: Record<string, number>): boolean {
+  const keys = Object.keys(right);
+  if (Object.keys(left).length !== keys.length) {
+    return false;
+  }
+  return keys.every((key) => left[key] === right[key]);
+}
+
+const leftoverItems = computed(() => {
+  if (leftoverIso.value === null) {
+    return [];
+  }
+  return daySchedules(leftoverIso.value).slice(dayVisibleCount(leftoverIso.value));
+});
 
 async function loadAll(): Promise<void> {
   busy.value = true;
@@ -350,6 +587,7 @@ function openPicker(event: Event): void {
 }
 
 function openAdd(iso: string): void {
+  closeLeftover();
   const first = activeCategories.value[0];
   scheduleForm.value = {
     id: null,
@@ -370,7 +608,7 @@ function openAdd(iso: string): void {
 }
 
 function openEdit(item: ScheduleItem): void {
-  leftoverIso.value = null;
+  closeLeftover();
   scheduleForm.value = {
     id: item.id,
     kind: item.kind,
@@ -392,6 +630,7 @@ function openEdit(item: ScheduleItem): void {
 }
 
 function onCellClick(iso: string): void {
+  closeLeftover();
   if (isMobile.value) {
     selectedIso.value = iso;
     return;
@@ -715,6 +954,22 @@ function syncCategoryNav(): void {
 
 watch([year, monthIndex], syncMonthLinks, { immediate: true });
 watch([listedCategories, prefs, busy], syncCategoryNav, { immediate: true });
+watch(gridEl, (el) => {
+  gridObserver?.disconnect();
+  gridObserver = null;
+  if (el === null) {
+    return;
+  }
+  gridObserver = new ResizeObserver(() => {
+    updateVisibleCounts();
+  });
+  gridObserver.observe(el);
+  updateVisibleCounts();
+});
+watch([cells, schedules, isMobile], async () => {
+  await nextTick();
+  updateVisibleCounts();
+});
 
 onMounted(async () => {
   media = window.matchMedia("(max-width: 767px)");
@@ -734,10 +989,12 @@ onMounted(async () => {
       void toggleShowDeleted();
     },
     openMobile: () => {
+      closeLeftover();
       categoryPanel.value = true;
     },
   });
   setHolidaySettingsHandler(() => {
+    closeLeftover();
     holidayPanel.value = true;
   });
   await loadAll();
@@ -750,14 +1007,14 @@ onUnmounted(() => {
   monthLinks.value = [];
   categoryNavItems.value = [];
   media?.removeEventListener("change", onMedia);
+  gridObserver?.disconnect();
   window.clearTimeout(successTimer);
+  window.clearTimeout(leftoverHideTimer);
 });
 </script>
 
 <template>
   <div class="page">
-    <p v-if="error" class="msg-error">{{ error }}</p>
-    <p v-if="success" class="msg-success">{{ success }}</p>
     <div v-if="!ready" class="loading">Loading…</div>
     <template v-else>
       <div class="toolbar">
@@ -783,7 +1040,7 @@ onUnmounted(() => {
               {{ item.label }}
             </button>
           </div>
-          <div class="grid">
+          <div ref="gridEl" class="grid">
             <div
               v-for="head in headers"
               :key="head.label"
@@ -812,58 +1069,45 @@ onUnmounted(() => {
                 </div>
               </div>
               <template v-if="!isMobile">
-                <button
-                  v-for="item in daySchedules(cell.iso).slice(0, PC_VISIBLE)"
-                  :key="item.id"
-                  class="item-row"
-                  type="button"
-                  :style="{ borderLeftColor: categoryColor(item.category_id) }"
-                  :class="{ done: item.kind === 'todo' && item.is_completed }"
-                  @click.stop="openEdit(item)"
-                >
-                  <input
-                    v-if="item.kind === 'todo'"
-                    type="checkbox"
-                    :checked="item.is_completed === true"
-                    :disabled="busy"
-                    @click="toggleTodo(item, $event)"
-                  />
-                  <span>{{ pcLabel(item, cell.iso) }}</span>
-                </button>
-                <div
-                  v-if="daySchedules(cell.iso).length > PC_VISIBLE"
-                  class="leftover caption"
-                  @mouseenter="leftoverIso = cell.iso"
-                  @mouseleave="leftoverIso = null"
-                  @click.stop
-                >
-                  ＋{{ daySchedules(cell.iso).length - PC_VISIBLE }}
-                  <div v-if="leftoverIso === cell.iso" class="leftover-pop">
-                    <button
-                      v-for="item in daySchedules(cell.iso).slice(PC_VISIBLE)"
-                      :key="item.id"
-                      class="item-row"
-                      type="button"
-                      :style="{ borderLeftColor: categoryColor(item.category_id) }"
-                      :class="{ done: item.kind === 'todo' && item.is_completed }"
-                      @click.stop="openEdit(item)"
-                    >
-                      <input
-                        v-if="item.kind === 'todo'"
-                        type="checkbox"
-                        :checked="item.is_completed === true"
-                        :disabled="busy"
-                        @click="toggleTodo(item, $event)"
-                      />
-                      <span>{{ pcLabel(item, cell.iso) }}</span>
-                    </button>
-                  </div>
+                <div class="cell-items">
+                  <button
+                    v-for="item in daySchedules(cell.iso).slice(0, dayVisibleCount(cell.iso))"
+                    :key="item.id"
+                    class="item-row"
+                    type="button"
+                    :style="itemTone(item.category_id)"
+                    :class="{ done: item.kind === 'todo' && item.is_completed }"
+                    @click.stop="openEdit(item)"
+                  >
+                    <input
+                      v-if="item.kind === 'todo'"
+                      type="checkbox"
+                      :checked="item.is_completed === true"
+                      :disabled="busy"
+                      @click="toggleTodo(item, $event)"
+                    />
+                    <span>{{ pcLabel(item, cell.iso) }}</span>
+                  </button>
                 </div>
+                <button
+                  v-if="dayLeftoverCount(cell.iso) > 0"
+                  class="leftover caption"
+                  type="button"
+                  @click.stop="onLeftoverClick(cell.iso, $event)"
+                  @mouseenter="cancelCloseLeftover"
+                  @mouseleave="scheduleCloseLeftover"
+                >
+                  ＋{{ dayLeftoverCount(cell.iso) }}
+                </button>
               </template>
               <div v-else class="dots">
                 <span v-for="(color, index) in dotsFor(cell.iso)" :key="index" class="dot" :style="{ background: color }"></span>
               </div>
             </div>
+          </div>
+          <div class="status-line">
+            <p v-if="error" class="msg-error">{{ error }}</p>
+            <p v-else-if="success" class="msg-success">{{ success }}</p>
           </div>
           <div v-if="isMobile && selectedIso" class="detail">
             <h3 :class="`tone-${selectedTone}`">
@@ -878,7 +1122,7 @@ onUnmounted(() => {
               :key="item.id"
               class="item-row"
               type="button"
-              :style="{ borderLeftColor: categoryColor(item.category_id) }"
+              :style="itemTone(item.category_id)"
               :class="{ done: item.kind === 'todo' && item.is_completed }"
               @click="openEdit(item)"
             >
@@ -889,6 +1133,36 @@ onUnmounted(() => {
       </div>
       <button v-if="isMobile" class="fab btn-primary" type="button" :disabled="busy" @click="openFab">＋</button>
     </template>
+
+    <Teleport to="body">
+      <div
+        v-if="leftoverIso && leftoverItems.length"
+        ref="leftoverPopEl"
+        class="leftover-pop"
+        :style="leftoverPopStyle"
+        @mouseenter="cancelCloseLeftover"
+        @mouseleave="scheduleCloseLeftover"
+      >
+        <button
+          v-for="item in leftoverItems"
+          :key="item.id"
+          class="item-row"
+          type="button"
+          :style="itemTone(item.category_id)"
+          :class="{ done: item.kind === 'todo' && item.is_completed }"
+          @click.stop="openEdit(item)"
+        >
+          <input
+            v-if="item.kind === 'todo'"
+            type="checkbox"
+            :checked="item.is_completed === true"
+            :disabled="busy"
+            @click="toggleTodo(item, $event)"
+          />
+          <span>{{ leftoverIso ? pcLabel(item, leftoverIso) : item.title }}</span>
+        </button>
+      </div>
+    </Teleport>
 
     <div v-if="categoryPanel" class="overlay">
       <div class="modal">
@@ -1214,6 +1488,9 @@ onUnmounted(() => {
   position: relative;
   overflow: hidden;
   background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .cell.out-month {
@@ -1237,6 +1514,13 @@ onUnmounted(() => {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space);
+  flex: none;
+}
+
+.cell-items {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .cell-date {
@@ -1259,15 +1543,30 @@ onUnmounted(() => {
   align-items: center;
   gap: var(--space);
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   text-align: left;
-  background: transparent;
   border: 0;
-  border-left: 4px solid var(--color-primary);
+  border-radius: var(--radius);
   padding: 2px var(--space);
-  color: var(--color-text);
   min-height: 22px;
   font-size: 14px;
   line-height: 1.2;
+  margin-top: 2px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.item-row span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-row input {
+  flex: none;
 }
 
 .item-row.done span {
@@ -1275,21 +1574,46 @@ onUnmounted(() => {
 }
 
 .leftover {
-  position: absolute;
-  right: var(--space);
-  bottom: var(--space);
+  flex: none;
+  align-self: flex-end;
+  margin: 2px 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: var(--color-text-muted);
+  line-height: 1.2;
 }
 
 .leftover-pop {
-  position: absolute;
-  right: 0;
-  bottom: 24px;
-  width: 220px;
+  position: fixed;
+  width: 240px;
+  max-height: 240px;
+  overflow: auto;
   background: var(--color-surface);
   border: 1px solid var(--color-primary);
   border-radius: var(--radius);
   padding: var(--space);
-  z-index: 5;
+  color: var(--color-text);
+  z-index: 15;
+}
+
+.status-line {
+  flex: none;
+  height: calc(var(--space) * 3);
+  display: flex;
+  align-items: center;
+  margin-top: var(--space);
+  overflow: hidden;
+}
+
+.status-line .msg-error,
+.status-line .msg-success {
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dots {
