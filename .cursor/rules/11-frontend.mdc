@@ -11,7 +11,7 @@ alwaysApply: false
 - フレームワーク: **Vue.js**
 - 言語: **typescript**（`any`の安易な使用は避ける）
 - デバッグ実行では、**このディレクトリ配下**で、`npm run dev`で起動できること
-- nginxでデプロイすることを想定
+- nginxでデプロイすることを想定。公開 URL とディスク配置は `17-nginx-deploy.mdc`（`base` は公開 URL、`createWebHistory(import.meta.env.BASE_URL)`）
 
 ## 画面の見た目
 

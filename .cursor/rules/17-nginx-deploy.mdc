@@ -1,0 +1,50 @@
+---
+description: nginx デプロイ時の公開 URL とディスク配置
+alwaysApply: true
+---
+
+# nginx デプロイ（フロント）
+
+機能名はディレクトリどおり kebab-case（`<feature-name>`）。公開 URL 用の名前はハイフンをアンダースコアにする。
+
+| | 規則 | 例（`user-management`） |
+|---|---|---|
+| ディスク | ドキュメントルートの `features/<feature-name>/` | `/var/www/html/features/user-management/` |
+| 公開 URL | `/portal_<アンダースコア名>/` | `/portal_user_management/` |
+
+`dist` はディスク側へコピーする。ブラウザでは公開 URL を開く。ディスク側のパスを URL として開かない。
+
+## Vite / Vue Router
+
+- `base` は公開 URL（末尾 `/`）
+- `createWebHistory(import.meta.env.BASE_URL)`
+
+```ts
+// ✅ GOOD
+base: "/portal_user_management/"
+
+// ❌ BAD: ディスクパスや別名
+base: "/features/user-management/"
+base: "/feature_user_management/"
+```
+
+## nginx
+
+`rewrite` は `last`。`break` と `try_files` を同じ location に置かない（JS/CSS が HTML になる）。`$uri/` は使わない。
+
+```nginx
+location /portal_user_management/ {
+    rewrite ^/portal_user_management/(.*)$ /features/user-management/$1 last;
+}
+
+location /features/user-management/ {
+    internal;
+    try_files $uri /features/user-management/index.html;
+}
+```
+
+機能マスタの遷移先 URL も公開 URL に合わせる（例: `https://<ホスト>/portal_user_management/users`）。
+
+## 例外
+
+機能 `portal` は既存どおり。公開 URL は `/portal/`、ディスクはドキュメントルートの `portal/`。

@@ -44,3 +44,5 @@ src
     ├ frontend    # .env を含む
     └ tests       # 同一機能の backend は import してよい。venv は backend/venv を使う
 ```
+
+nginx でフロントを出すときの公開 URL とディスク配置は `17-nginx-deploy.mdc`。
