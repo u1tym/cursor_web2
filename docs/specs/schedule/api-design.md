@@ -33,6 +33,12 @@ GET `/settings` だけ認証不要。それ以外は認証要かつ本機能の�
 - `kind` は `event`（予定）または `todo`（TODO）
 - `granularity` は `day`（日単位）または `time`（時間単位）
 - `week_starts_on` は `sunday` または `monday`
+- `occurrence_type` は `date`（日付指定）または `weekday`（曜日指定）
+- `date_rule` は `last_day`（月末日）または `day_of_month`（毎月 X 日）
+- `weekday_rule` は `nth`（N 番目）または `nth_from_last`（最終から N 番目）
+- `weekday` は `sunday`〜`saturday`
+- `shift_direction` は `earlier`（前）または `later`（後）
+- `exclusion_kind` は `holiday`、`sunday`、`monday`、`tuesday`、`wednesday`、`thursday`、`friday`、`saturday`
 - 色は `#` に続く 16 進 6 桁（例: `#4DA3FF`）
 
 ### エラー（共通）
@@ -70,8 +76,14 @@ GET `/settings` だけ認証不要。それ以外は認証要かつ本機能の�
 | POST | `/user-holidays` | 要 | REQ-028 |
 | PATCH | `/user-holidays/{user_holiday_id}` | 要 | REQ-029 |
 | DELETE | `/user-holidays/{user_holiday_id}` | 要 | REQ-030 |
+| GET | `/routines` | 要 | REQ-031, REQ-032, REQ-035 |
+| POST | `/routines` | 要 | REQ-033 |
+| PATCH | `/routines/{routine_id}` | 要 | REQ-040 |
+| DELETE | `/routines/{routine_id}` | 要 | REQ-034 |
+| POST | `/routines/{routine_id}/apply` | 要 | REQ-036, REQ-038, REQ-039 |
+| POST | `/routines/apply-all` | 要 | REQ-037, REQ-038, REQ-039 |
 
-REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026 は画面側。REQ-027 は各操作 API のログであり、専用エンドポイントは無い。
+REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026、REQ-035 の画面配置は画面側。REQ-027 は各操作 API のログであり、専用エンドポイントは無い。
 
 ## エンドポイント
 
@@ -132,13 +144,14 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026 は画面側。REQ-027 は各操
       "start_time": null,
       "end_time": null,
       "category_id": 1,
-      "is_completed": null
+      "is_completed": null,
+      "routine_id": null
     }
   ]
 }
 ```
 
-`location` と `detail` は無いとき `null`。日単位のとき `start_time` と `end_time` は `null`。予定のとき `is_completed` は `null`。TODO のとき `true` または `false`。
+`location` と `detail` は無いとき `null`。日単位のとき `start_time` と `end_time` は `null`。予定のとき `is_completed` は `null`。TODO のとき `true` または `false`。`routine_id` は手入力なら `null`。適用で作ったものはルーチンの `id`。
 
 `items` は REQ-019 の順。範囲に重なる本人の未削除だけ。カテゴリの表示／非表示では落とさない。0 件なら空配列。
 
@@ -174,7 +187,7 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026 は画面側。REQ-027 は各操
 }
 ```
 
-`location` と `detail` は省略可。空または省略なら `null` として保存する。日単位のとき `start_time` と `end_time` は省略するか `null`。時間単位のときは必須。`is_completed` は受け付けない。TODO は未実施で作る。
+`location` と `detail` は省略可。空または省略なら `null` として保存する。日単位のとき `start_time` と `end_time` は省略するか `null`。時間単位のときは必須。`is_completed` は受け付けない。TODO は未実施で作る。`routine_id` は受け付けない。常に無しで作る。
 
 応答: 201。GET 一件と同じ形。
 
@@ -194,7 +207,7 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026 は画面側。REQ-027 は各操
 - 認証: 要
 - 対応 REQ: REQ-008
 
-要求: POST と同じ項目。すべて必須（`location` と `detail` は空可）。`kind` を予定から TODO にするときは未実施にする。TODO から予定にするときは実施状態を捨てる。更新時の `is_completed` は受け付けない（実施状態は completion で変える。種別変更に伴う未実施化は本 API が行う）。
+要求: POST と同じ項目。すべて必須（`location` と `detail` は空可）。`kind` を予定から TODO にするときは未実施にする。TODO から予定にするときは実施状態を捨てる。更新時の `is_completed` は受け付けない（実施状態は completion で変える。種別変更に伴う未実施化は本 API が行う）。`routine_id` は受け付けない。既存の値は変えない。
 
 応答: 200。GET 一件と同じ形。
 
@@ -357,7 +370,7 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026 は画面側。REQ-027 は各操
 
 応答: 204。本文なし。
 
-処理概要: 本人の未削除カテゴリを論理削除する。紐づくスケジュールの `category_id` は変えない。
+処理概要: 本人の未削除カテゴリを論理削除する。紐づくスケジュールとルーチンの `category_id` は変えない。
 
 エラー:
 
@@ -575,6 +588,203 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026 は画面側。REQ-027 は各操
 | 権限なし | 403 |
 | 対象なし、既に論理削除済み、他ユーザ | 404 |
 
+### GET `/routines`
+
+- 認証: 要
+- 対応 REQ: REQ-031, REQ-032, REQ-035
+
+要求: なし
+
+応答: 200
+
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "title": "string",
+      "detail": "string",
+      "kind": "event",
+      "category_id": 1,
+      "occurrence_type": "date",
+      "date_rule": "last_day",
+      "day_of_month": null,
+      "weekday_rule": null,
+      "weekday_n": null,
+      "weekday": null,
+      "adjust_excluded": false,
+      "shift_direction": null,
+      "months": [1, 4, 7, 10],
+      "exclusions": ["holiday", "sunday"]
+    }
+  ]
+}
+```
+
+本人の未削除のみ。`title` の昇順、同じなら `id` の昇順。0 件なら空配列。`detail` は無いとき `null`。日付指定のとき `weekday_rule` / `weekday_n` / `weekday` は `null`。`date_rule` が `last_day` のとき `day_of_month` は `null`。曜日指定のとき `date_rule` / `day_of_month` は `null`。除外調整が無のとき `shift_direction` は `null`、`exclusions` は空配列。`months` は 1〜12 の配列（重複なし、昇順）。
+
+処理概要: 本人の未削除ルーチンを返す。
+
+エラー:
+
+| 状況 | 応答 |
+|------|------|
+| 未ログイン | 401 |
+| 権限なし | 403 |
+
+### POST `/routines`
+
+- 認証: 要
+- 対応 REQ: REQ-033
+
+要求:
+
+```json
+{
+  "title": "string",
+  "detail": "string",
+  "kind": "event",
+  "category_id": 1,
+  "occurrence_type": "date",
+  "date_rule": "day_of_month",
+  "day_of_month": 15,
+  "weekday_rule": null,
+  "weekday_n": null,
+  "weekday": null,
+  "adjust_excluded": true,
+  "shift_direction": "earlier",
+  "months": [1, 4, 7, 10],
+  "exclusions": ["holiday", "sunday"]
+}
+```
+
+`detail` は省略可。空または省略なら `null`。日付指定のとき `date_rule` は必須。`last_day` なら `day_of_month` は省略または `null`。`day_of_month` なら 1〜31。曜日の項目は省略または `null`。曜日指定のとき `weekday_rule`、`weekday_n`（1〜5）、`weekday` は必須。日付の項目は省略または `null`。`months` は 1〜12 を 1 件以上（重複不可）。除外調整が無のとき `shift_direction` は省略または `null`、`exclusions` は省略または空配列。有のとき `shift_direction` は必須、`exclusions` は 1 件以上。
+
+応答: 201。GET 一件と同じ形。
+
+処理概要: 操作中ユーザのルーチンとして追加する。識別はサーバが付与する。
+
+エラー:
+
+| 状況 | 応答 |
+|------|------|
+| 必須項目が無い／空、適用日タイプと項目の組合せが不正、`months` が 0 件または範囲外、除外調整が有なのに除外 0 件またはずらしかたが無い | 400 |
+| 未ログイン | 401 |
+| 権限なし | 403 |
+| カテゴリが無い／論理削除済み／他ユーザ | 404 |
+
+### PATCH `/routines/{routine_id}`
+
+- 認証: 要
+- 対応 REQ: REQ-040
+
+要求: POST `/routines` と同じ形。
+
+応答: 200。GET 一件と同じ形。
+
+処理概要: 本人の未削除ルーチンの項目を更新する。反映月と除外対象は置き換える。紐づくスケジュールは変えない。`routine_id`（識別）は変えない。
+
+エラー:
+
+| 状況 | 応答 |
+|------|------|
+| 必須項目が無い／空、適用日タイプと項目の組合せが不正、`months` が 0 件または範囲外、除外調整が有なのに除外 0 件またはずらしかたが無い | 400 |
+| 未ログイン | 401 |
+| 権限なし | 403 |
+| 対象なし、既に論理削除済み、他ユーザ | 404 |
+| カテゴリが無い／論理削除済み／他ユーザ | 404 |
+
+### DELETE `/routines/{routine_id}`
+
+- 認証: 要
+- 対応 REQ: REQ-034
+
+要求: なし
+
+応答: 204。本文なし。
+
+処理概要: 本人の未削除ルーチンを論理削除する。紐づくスケジュールの `routine_id` は変えない。反映月と除外対象の行は残す。
+
+エラー:
+
+| 状況 | 応答 |
+|------|------|
+| 未ログイン | 401 |
+| 権限なし | 403 |
+| 対象なし、既に論理削除済み、他ユーザ | 404 |
+
+### POST `/routines/{routine_id}/apply`
+
+- 認証: 要
+- 対応 REQ: REQ-036, REQ-038, REQ-039
+
+要求:
+
+```json
+{
+  "year": 2026,
+  "month": 8
+}
+```
+
+`year` は西暦。`month` は 1〜12。
+
+応答: 200
+
+```json
+{
+  "items": [
+    {
+      "id": 10,
+      "title": "string",
+      "location": null,
+      "detail": "string",
+      "kind": "event",
+      "granularity": "day",
+      "start_date": "2026-08-15",
+      "end_date": "2026-08-15",
+      "start_time": null,
+      "end_time": null,
+      "category_id": 1,
+      "is_completed": null,
+      "routine_id": 1
+    }
+  ]
+}
+```
+
+作ったスケジュールは GET `/schedules` 一件と同じ形。日単位。開始と終了は適用日。場所は `null`。TODO なら `is_completed` は `false`。`routine_id` は当該ルーチンの `id`。登録しなかったときは `items` は空配列（200 のまま）。
+
+処理概要: 指定年月に当該ルーチンを適用する。反映月に含まれない、指定年月に同一 `routine_id` の未削除がある、基準日または適用日を決められない、カテゴリが論理削除済みまたは本人のものでない、ときは登録しない。失敗にはしない。基準日・適用日の決め方は `design.md`。
+
+エラー:
+
+| 状況 | 応答 |
+|------|------|
+| `year` / `month` が無い、整数でない、または `month` が 1〜12 でない | 400 |
+| 未ログイン | 401 |
+| 権限なし | 403 |
+| ルーチンが無い／論理削除済み／他ユーザ | 404 |
+
+### POST `/routines/apply-all`
+
+- 認証: 要
+- 対応 REQ: REQ-037, REQ-038, REQ-039
+
+要求: POST `/routines/{routine_id}/apply` と同じ（`year` と `month`）。
+
+応答: 200。形は 1 件適用と同じ。`items` は今回作ったスケジュールをすべて含む。0 件なら空配列。並びは REQ-019。
+
+処理概要: 本人の未削除ルーチンのそれぞれについて、1 件適用と同じ規則で指定年月へ適用する。ある件が登録しなくても他件を続ける。
+
+エラー:
+
+| 状況 | 応答 |
+|------|------|
+| `year` / `month` が無い、整数でない、または `month` が 1〜12 でない | 400 |
+| 未ログイン | 401 |
+| 権限なし | 403 |
+
 ## 要件トレーサビリティ
 
 | 要件 | 設計 |
@@ -582,11 +792,11 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026 は画面側。REQ-027 は各操
 | REQ-001 | 共通の認証。GET `/settings`。各操作 API の 401 / 403 |
 | REQ-002 | 各 GET が本人分のみ。他ユーザは 404 |
 | REQ-003 | POST/PATCH `/schedules` の `kind` と `is_completed` |
-| REQ-004 | スケジュールの要求・応答項目 |
+| REQ-004 | スケジュールの要求・応答項目。`routine_id` は応答のみ |
 | REQ-005 | `granularity` と日付／時刻 |
 | REQ-006 | 終了が開始より前は 400 |
-| REQ-007 | POST `/schedules` |
-| REQ-008 | PATCH `/schedules/{schedule_id}` |
+| REQ-007 | POST `/schedules`。`routine_id` は受け付けない |
+| REQ-008 | PATCH `/schedules/{schedule_id}`。`routine_id` は変えない |
 | REQ-009 | DELETE `/schedules/{schedule_id}` |
 | REQ-010 | PATCH `/schedules/{schedule_id}/completion` |
 | REQ-011 | GET/POST `/categories` |
@@ -604,6 +814,16 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026 は画面側。REQ-027 は各操
 | REQ-028 | GET/POST `/user-holidays` |
 | REQ-029 | PATCH `/user-holidays/{user_holiday_id}` |
 | REQ-030 | DELETE `/user-holidays/{user_holiday_id}` |
+| REQ-031 | GET/POST `/routines` の `id` |
+| REQ-032 | GET/POST/PATCH `/routines` の項目 |
+| REQ-033 | POST `/routines` |
+| REQ-034 | DELETE `/routines/{routine_id}` |
+| REQ-035 | GET `/routines`。画面配置は `ui-design.md` |
+| REQ-036 | POST `/routines/{routine_id}/apply` |
+| REQ-037 | POST `/routines/apply-all` |
+| REQ-038 | 適用 API の基準日算出（専用パスなし） |
+| REQ-039 | 適用 API の除外調整（専用パスなし） |
+| REQ-040 | PATCH `/routines/{routine_id}` |
 
 ## 未決事項
 
@@ -617,3 +837,7 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026 は画面側。REQ-027 は各操
 |------|------|----------|
 | 2026-08-27 21:55 | 未承認 | 初版 |
 | 2026-08-27 22:00 | 承認済み | 初版を承認 |
+| 2026-08-29 23:41 | 未承認 | ルーチンの一覧・追加・削除・適用 API。スケジュール応答に `routine_id` |
+| 2026-08-29 23:46 | 承認済み | ルーチン API とスケジュールの `routine_id` を承認 |
+| 2026-08-30 00:17 | 未承認 | PATCH `/routines/{routine_id}`（項目更新。紐づくスケジュールは変えない） |
+| 2026-08-30 00:23 | 承認済み | PATCH `/routines/{routine_id}` を承認 |

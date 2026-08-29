@@ -64,6 +64,7 @@ class ScheduleRow:
     end_time: time | None
     is_completed: bool | None
     is_deleted: bool
+    routine_id: int | None
 
 
 @dataclass(frozen=True)
@@ -80,6 +81,27 @@ class UserHolidayRow:
     holiday_date: date
     name: str
     is_deleted: bool
+
+
+@dataclass(frozen=True)
+class RoutineRow:
+    id: int
+    user_id: int
+    category_id: int
+    title: str
+    detail: str | None
+    kind: str
+    occurrence_type: str
+    date_rule: str | None
+    day_of_month: int | None
+    weekday_rule: str | None
+    weekday_n: int | None
+    weekday: str | None
+    adjust_excluded: bool
+    shift_direction: str | None
+    is_deleted: bool
+    months: tuple[int, ...]
+    exclusions: tuple[str, ...]
 
 
 def get_user_by_username(username: str) -> UserRow | None:
@@ -335,12 +357,13 @@ def _schedule_from_row(row: dict[str, object]) -> ScheduleRow:
         end_time=end_time,
         is_completed=bool(is_completed) if is_completed is not None else None,
         is_deleted=bool(row["is_deleted"]),
+        routine_id=int(row["routine_id"]) if row["routine_id"] is not None else None,
     )
 
 
 _SCHEDULE_SELECT = """
     SELECT id, user_id, category_id, title, location, detail, kind, granularity,
-           start_date, end_date, start_time, end_time, is_completed, is_deleted
+           start_date, end_date, start_time, end_time, is_completed, is_deleted, routine_id
     FROM schedule.schedules
 """
 
@@ -400,6 +423,7 @@ def insert_schedule(
     start_time: time | None,
     end_time: time | None,
     is_completed: bool | None,
+    routine_id: int | None = None,
 ) -> ScheduleRow:
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -407,11 +431,12 @@ def insert_schedule(
                 """
                 INSERT INTO schedule.schedules (
                     user_id, category_id, title, location, detail, kind, granularity,
-                    start_date, end_date, start_time, end_time, is_completed
+                    start_date, end_date, start_time, end_time, is_completed, routine_id
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id, user_id, category_id, title, location, detail, kind, granularity,
-                          start_date, end_date, start_time, end_time, is_completed, is_deleted
+                          start_date, end_date, start_time, end_time, is_completed, is_deleted,
+                          routine_id
                 """,
                 (
                     user_id,
@@ -426,6 +451,7 @@ def insert_schedule(
                     start_time,
                     end_time,
                     is_completed,
+                    routine_id,
                 ),
             )
             row = cur.fetchone()
@@ -681,3 +707,293 @@ def logical_delete_user_holiday(holiday_id: int, user_id: int) -> None:
                 """,
                 (holiday_id, user_id),
             )
+
+
+def _routine_from_row(
+    row: dict[str, object],
+    months: tuple[int, ...],
+    exclusions: tuple[str, ...],
+) -> RoutineRow:
+    detail = row["detail"]
+    date_rule = row["date_rule"]
+    day_of_month = row["day_of_month"]
+    weekday_rule = row["weekday_rule"]
+    weekday_n = row["weekday_n"]
+    weekday = row["weekday"]
+    shift_direction = row["shift_direction"]
+    return RoutineRow(
+        id=int(row["id"]),
+        user_id=int(row["user_id"]),
+        category_id=int(row["category_id"]),
+        title=str(row["title"]),
+        detail=str(detail) if detail is not None else None,
+        kind=str(row["kind"]),
+        occurrence_type=str(row["occurrence_type"]),
+        date_rule=str(date_rule) if date_rule is not None else None,
+        day_of_month=int(day_of_month) if day_of_month is not None else None,
+        weekday_rule=str(weekday_rule) if weekday_rule is not None else None,
+        weekday_n=int(weekday_n) if weekday_n is not None else None,
+        weekday=str(weekday) if weekday is not None else None,
+        adjust_excluded=bool(row["adjust_excluded"]),
+        shift_direction=str(shift_direction) if shift_direction is not None else None,
+        is_deleted=bool(row["is_deleted"]),
+        months=months,
+        exclusions=exclusions,
+    )
+
+
+_ROUTINE_SELECT = """
+    SELECT id, user_id, category_id, title, detail, kind, occurrence_type, date_rule,
+           day_of_month, weekday_rule, weekday_n, weekday, adjust_excluded,
+           shift_direction, is_deleted
+    FROM schedule.routines
+"""
+
+
+def _months_and_exclusions(
+    cur: object,
+    routine_ids: list[int],
+) -> tuple[dict[int, list[int]], dict[int, list[str]]]:
+    months: dict[int, list[int]] = {routine_id: [] for routine_id in routine_ids}
+    exclusions: dict[int, list[str]] = {routine_id: [] for routine_id in routine_ids}
+    if not routine_ids:
+        return months, exclusions
+    cur.execute(
+        """
+        SELECT routine_id, month
+        FROM schedule.routine_months
+        WHERE routine_id = ANY(%s)
+        ORDER BY month ASC
+        """,
+        (routine_ids,),
+    )
+    for row in cur.fetchall():
+        months[int(row["routine_id"])].append(int(row["month"]))
+    cur.execute(
+        """
+        SELECT routine_id, exclusion_kind
+        FROM schedule.routine_exclusions
+        WHERE routine_id = ANY(%s)
+        ORDER BY exclusion_kind ASC
+        """,
+        (routine_ids,),
+    )
+    for row in cur.fetchall():
+        exclusions[int(row["routine_id"])].append(str(row["exclusion_kind"]))
+    return months, exclusions
+
+
+def list_routines(user_id: int) -> list[RoutineRow]:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                _ROUTINE_SELECT
+                + """
+                WHERE user_id = %s AND is_deleted = false
+                ORDER BY title ASC, id ASC
+                """,
+                (user_id,),
+            )
+            rows = list(cur.fetchall())
+            ids = [int(row["id"]) for row in rows]
+            months_map, exclusions_map = _months_and_exclusions(cur, ids)
+            return [
+                _routine_from_row(
+                    row,
+                    tuple(months_map[int(row["id"])]),
+                    tuple(exclusions_map[int(row["id"])]),
+                )
+                for row in rows
+            ]
+
+
+def get_routine(user_id: int, routine_id: int) -> RoutineRow | None:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                _ROUTINE_SELECT + " WHERE id = %s AND user_id = %s",
+                (routine_id, user_id),
+            )
+            row = cur.fetchone()
+            if row is None:
+                return None
+            months_map, exclusions_map = _months_and_exclusions(cur, [int(row["id"])])
+            return _routine_from_row(
+                row,
+                tuple(months_map[int(row["id"])]),
+                tuple(exclusions_map[int(row["id"])]),
+            )
+
+
+def insert_routine(
+    user_id: int,
+    category_id: int,
+    title: str,
+    detail: str | None,
+    kind: str,
+    occurrence_type: str,
+    date_rule: str | None,
+    day_of_month: int | None,
+    weekday_rule: str | None,
+    weekday_n: int | None,
+    weekday: str | None,
+    adjust_excluded: bool,
+    shift_direction: str | None,
+    months: list[int],
+    exclusions: list[str],
+) -> RoutineRow:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO schedule.routines (
+                    user_id, category_id, title, detail, kind, occurrence_type, date_rule,
+                    day_of_month, weekday_rule, weekday_n, weekday, adjust_excluded,
+                    shift_direction
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id, user_id, category_id, title, detail, kind, occurrence_type,
+                          date_rule, day_of_month, weekday_rule, weekday_n, weekday,
+                          adjust_excluded, shift_direction, is_deleted
+                """,
+                (
+                    user_id,
+                    category_id,
+                    title,
+                    detail,
+                    kind,
+                    occurrence_type,
+                    date_rule,
+                    day_of_month,
+                    weekday_rule,
+                    weekday_n,
+                    weekday,
+                    adjust_excluded,
+                    shift_direction,
+                ),
+            )
+            row = cur.fetchone()
+            assert row is not None
+            routine_id = int(row["id"])
+            for month in months:
+                cur.execute(
+                    """
+                    INSERT INTO schedule.routine_months (routine_id, month)
+                    VALUES (%s, %s)
+                    """,
+                    (routine_id, month),
+                )
+            for kind_value in exclusions:
+                cur.execute(
+                    """
+                    INSERT INTO schedule.routine_exclusions (routine_id, exclusion_kind)
+                    VALUES (%s, %s)
+                    """,
+                    (routine_id, kind_value),
+                )
+            return _routine_from_row(row, tuple(sorted(months)), tuple(sorted(exclusions)))
+
+
+def update_routine(
+    routine_id: int,
+    user_id: int,
+    category_id: int,
+    title: str,
+    detail: str | None,
+    kind: str,
+    occurrence_type: str,
+    date_rule: str | None,
+    day_of_month: int | None,
+    weekday_rule: str | None,
+    weekday_n: int | None,
+    weekday: str | None,
+    adjust_excluded: bool,
+    shift_direction: str | None,
+    months: list[int],
+    exclusions: list[str],
+) -> RoutineRow | None:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE schedule.routines
+                SET category_id = %s, title = %s, detail = %s, kind = %s, occurrence_type = %s,
+                    date_rule = %s, day_of_month = %s, weekday_rule = %s, weekday_n = %s,
+                    weekday = %s, adjust_excluded = %s, shift_direction = %s
+                WHERE id = %s AND user_id = %s AND is_deleted = false
+                RETURNING id, user_id, category_id, title, detail, kind, occurrence_type,
+                          date_rule, day_of_month, weekday_rule, weekday_n, weekday,
+                          adjust_excluded, shift_direction, is_deleted
+                """,
+                (
+                    category_id,
+                    title,
+                    detail,
+                    kind,
+                    occurrence_type,
+                    date_rule,
+                    day_of_month,
+                    weekday_rule,
+                    weekday_n,
+                    weekday,
+                    adjust_excluded,
+                    shift_direction,
+                    routine_id,
+                    user_id,
+                ),
+            )
+            row = cur.fetchone()
+            if row is None:
+                return None
+            cur.execute("DELETE FROM schedule.routine_months WHERE routine_id = %s", (routine_id,))
+            cur.execute("DELETE FROM schedule.routine_exclusions WHERE routine_id = %s", (routine_id,))
+            for month in months:
+                cur.execute(
+                    """
+                    INSERT INTO schedule.routine_months (routine_id, month)
+                    VALUES (%s, %s)
+                    """,
+                    (routine_id, month),
+                )
+            for kind_value in exclusions:
+                cur.execute(
+                    """
+                    INSERT INTO schedule.routine_exclusions (routine_id, exclusion_kind)
+                    VALUES (%s, %s)
+                    """,
+                    (routine_id, kind_value),
+                )
+            return _routine_from_row(row, tuple(sorted(months)), tuple(sorted(exclusions)))
+
+
+def logical_delete_routine(routine_id: int, user_id: int) -> None:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE schedule.routines
+                SET is_deleted = true
+                WHERE id = %s AND user_id = %s AND is_deleted = false
+                """,
+                (routine_id, user_id),
+            )
+
+
+def exists_routine_in_year_month(user_id: int, routine_id: int, year: int, month: int) -> bool:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT 1
+                FROM schedule.schedules
+                WHERE user_id = %s
+                  AND routine_id = %s
+                  AND is_deleted = false
+                  AND EXTRACT(YEAR FROM start_date) = %s
+                  AND EXTRACT(MONTH FROM start_date) = %s
+                LIMIT 1
+                """,
+                (user_id, routine_id, year, month),
+            )
+            return cur.fetchone() is not None
+

@@ -435,7 +435,8 @@ textarea.field {
 .modal {
   width: min(480px, 100%);
   max-height: calc(100% - calc(var(--space) * 6));
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);

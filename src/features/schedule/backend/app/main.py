@@ -10,6 +10,7 @@ from app.logger import setup_logging, write
 from app.routers.categories import router as category_router
 from app.routers.holidays import router as holiday_router
 from app.routers.preferences import router as preference_router
+from app.routers.routines import router as routine_router
 from app.routers.schedules import router as schedule_router
 from app.routers.settings import router as settings_router
 from app.routers.user_holidays import router as user_holiday_router
@@ -33,6 +34,7 @@ def create_app() -> FastAPI:
     app.include_router(preference_router)
     app.include_router(holiday_router)
     app.include_router(user_holiday_router)
+    app.include_router(routine_router)
 
     @app.exception_handler(RequestValidationError)
     async def on_validation(_request: Request, _exc: RequestValidationError) -> JSONResponse:

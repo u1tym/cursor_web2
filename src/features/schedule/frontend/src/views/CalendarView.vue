@@ -2,24 +2,32 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import {
   AuthError,
+  applyAllRoutines,
+  applyRoutine,
   createCategory,
+  createRoutine,
   createSchedule,
   createUserHoliday,
   deleteCategory,
+  deleteRoutine,
   deleteSchedule,
   deleteUserHoliday,
   getCategories,
   getHolidays,
   getPreferences,
+  getRoutines,
   getSchedules,
   getUserHolidays,
   savePreferences,
   updateCategory,
   updateCompletion,
+  updateRoutine,
   updateSchedule,
   type CategoryItem,
   type HolidayItem,
   type Preferences,
+  type RoutineItem,
+  type RoutinePayload,
   type ScheduleItem,
   type SchedulePayload,
   type UserHolidayItem,
@@ -38,6 +46,7 @@ import {
 import { setHolidaySettingsHandler } from "../holiday-settings";
 import iconEdit from "../assets/icon-edit.png";
 import iconLeft from "../assets/icon-left.png";
+import iconNew from "../assets/icon-new.png";
 import iconRight from "../assets/icon-right.png";
 import iconTrash from "../assets/icon-trash.png";
 import { monthLinks, setMonthHandler } from "../month-nav";
@@ -53,6 +62,35 @@ const emit = defineEmits<{ "auth-error": [unknown] }>();
 const ITEM_ROW_PX = 24;
 const LEFTOVER_ROW_PX = 20;
 const LEFTOVER_HIDE_MS = 1000;
+
+const ROUTINE_MONTHS = [
+  { n: 1, label: "Jan" },
+  { n: 2, label: "Feb" },
+  { n: 3, label: "Mar" },
+  { n: 4, label: "Apr" },
+  { n: 5, label: "May" },
+  { n: 6, label: "Jun" },
+  { n: 7, label: "Jul" },
+  { n: 8, label: "Aug" },
+  { n: 9, label: "Sep" },
+  { n: 10, label: "Oct" },
+  { n: 11, label: "Nov" },
+  { n: 12, label: "Dec" },
+];
+const ROUTINE_WEEKDAYS = [
+  { value: "sunday", label: "Sun" },
+  { value: "monday", label: "Mon" },
+  { value: "tuesday", label: "Tue" },
+  { value: "wednesday", label: "Wed" },
+  { value: "thursday", label: "Thu" },
+  { value: "friday", label: "Fri" },
+  { value: "saturday", label: "Sat" },
+] as const;
+const ROUTINE_EXCLUSIONS = [
+  { value: "holiday", label: "Holiday" },
+  ...ROUTINE_WEEKDAYS,
+];
+const ALL_MONTHS = ROUTINE_MONTHS.map((item) => item.n);
 
 const busy = ref(false);
 const ready = ref(false);
@@ -87,9 +125,33 @@ const userHolidays = ref<UserHolidayItem[]>([]);
 const scheduleOpen = ref(false);
 const categoryOpen = ref(false);
 const holidayOpen = ref(false);
-const confirmKind = ref<"schedule" | "category" | null>(null);
+const confirmKind = ref<"schedule" | "category" | "routine" | null>(null);
 const confirmId = ref<number | null>(null);
 const formError = ref("");
+const routines = ref<RoutineItem[]>([]);
+const selectedRoutineId = ref<number | null>(null);
+const routineOpen = ref(false);
+const applyOpen = ref(false);
+const applyMode = ref<"one" | "all">("one");
+const applyYear = ref(new Date().getFullYear());
+const applyMonthIndex = ref(new Date().getMonth());
+const routineForm = ref({
+  id: null as number | null,
+  title: "",
+  detail: "",
+  kind: "event" as "event" | "todo",
+  category_id: null as number | null,
+  occurrence_type: "date" as "date" | "weekday",
+  date_rule: "last_day" as "last_day" | "day_of_month",
+  day_of_month: 1,
+  weekday_rule: "nth" as "nth" | "nth_from_last",
+  weekday_n: 1,
+  weekday: "sunday" as (typeof ROUTINE_WEEKDAYS)[number]["value"],
+  adjust_excluded: false,
+  shift_direction: "earlier" as "earlier" | "later",
+  months: [...ALL_MONTHS],
+  exclusions: [] as string[],
+});
 
 const scheduleForm = ref({
   id: null as number | null,
@@ -248,6 +310,7 @@ const cells = computed(() => monthCells(year.value, monthIndex.value, prefs.valu
 const weekRowCount = computed(() => Math.max(1, Math.round(cells.value.length / 7)));
 const headers = computed(() => weekdayHeaders(prefs.value.week_starts_on));
 const titleText = computed(() => monthLabel(year.value, monthIndex.value));
+const applyMonthText = computed(() => monthLabel(applyYear.value, applyMonthIndex.value));
 const todayIso = computed(() => toIso(new Date()));
 const rangeStart = computed(() => cells.value[0]?.iso ?? "");
 const rangeEnd = computed(() => cells.value[cells.value.length - 1]?.iso ?? "");
@@ -748,7 +811,7 @@ async function toggleTodo(item: ScheduleItem, event: Event): Promise<void> {
   }
 }
 
-function askDelete(kind: "schedule" | "category", id: number): void {
+function askDelete(kind: "schedule" | "category" | "routine", id: number): void {
   confirmKind.value = kind;
   confirmId.value = id;
 }
@@ -777,6 +840,14 @@ async function confirmDelete(): Promise<void> {
         categories.value = await getCategories(true);
         await loadMonth();
       }
+    } else if (confirmKind.value === "routine") {
+      const result = await deleteRoutine(confirmId.value);
+      if (result === "missing") {
+        error.value = "Not found";
+      } else {
+        flash("Deleted");
+      }
+      await loadRoutines();
     }
   } catch (caught) {
     if (!handle(caught)) {
@@ -785,6 +856,255 @@ async function confirmDelete(): Promise<void> {
   } finally {
     confirmKind.value = null;
     confirmId.value = null;
+    busy.value = false;
+  }
+}
+
+async function loadRoutines(): Promise<void> {
+  routines.value = await getRoutines();
+  if (
+    selectedRoutineId.value !== null &&
+    !routines.value.some((item) => item.id === selectedRoutineId.value)
+  ) {
+    selectedRoutineId.value = null;
+  }
+}
+
+async function openSettings(): Promise<void> {
+  closeLeftover();
+  closeDayMenu();
+  selectedRoutineId.value = null;
+  settingsPanel.value = true;
+  try {
+    await loadRoutines();
+  } catch (caught) {
+    if (!handle(caught)) {
+      error.value = "Server error";
+    }
+  }
+}
+
+function shiftApplyMonth(delta: number): void {
+  const next = addMonths(applyYear.value, applyMonthIndex.value, delta);
+  applyYear.value = next.year;
+  applyMonthIndex.value = next.monthIndex;
+}
+
+function emptyRoutineForm(): typeof routineForm.value {
+  const first = activeCategories.value[0];
+  return {
+    id: null,
+    title: "",
+    detail: "",
+    kind: "event",
+    category_id: first ? first.id : null,
+    occurrence_type: "date",
+    date_rule: "last_day",
+    day_of_month: 1,
+    weekday_rule: "nth",
+    weekday_n: 1,
+    weekday: "sunday",
+    adjust_excluded: false,
+    shift_direction: "earlier",
+    months: [...ALL_MONTHS],
+    exclusions: [],
+  };
+}
+
+function openRoutineAdd(): void {
+  routineForm.value = emptyRoutineForm();
+  formError.value = "";
+  routineOpen.value = true;
+}
+
+function openRoutineEdit(item: RoutineItem, event: Event): void {
+  event.stopPropagation();
+  const categoryOk = activeCategories.value.some((row) => row.id === item.category_id);
+  routineForm.value = {
+    id: item.id,
+    title: item.title,
+    detail: item.detail ?? "",
+    kind: item.kind,
+    category_id: categoryOk ? item.category_id : null,
+    occurrence_type: item.occurrence_type,
+    date_rule: item.date_rule ?? "last_day",
+    day_of_month: item.day_of_month ?? 1,
+    weekday_rule: item.weekday_rule ?? "nth",
+    weekday_n: item.weekday_n ?? 1,
+    weekday: item.weekday ?? "sunday",
+    adjust_excluded: item.adjust_excluded,
+    shift_direction: item.shift_direction ?? "earlier",
+    months: [...item.months],
+    exclusions: [...item.exclusions],
+  };
+  formError.value = "";
+  routineOpen.value = true;
+}
+
+function openApplyDialog(mode: "one" | "all"): void {
+  if (mode === "one" && selectedRoutineId.value === null) {
+    return;
+  }
+  applyMode.value = mode;
+  applyYear.value = year.value;
+  applyMonthIndex.value = monthIndex.value;
+  applyOpen.value = true;
+}
+
+function toggleRoutineMonth(month: number): void {
+  const current = routineForm.value.months;
+  routineForm.value.months = current.includes(month)
+    ? current.filter((item) => item !== month)
+    : [...current, month].sort((left, right) => left - right);
+}
+
+function toggleRoutineExclusion(value: string): void {
+  const current = routineForm.value.exclusions;
+  routineForm.value.exclusions = current.includes(value)
+    ? current.filter((item) => item !== value)
+    : [...current, value];
+}
+
+function routinePayload(): RoutinePayload | null {
+  const form = routineForm.value;
+  if (form.title.trim() === "") {
+    return null;
+  }
+  if (form.category_id === null) {
+    formError.value = "Add a category first";
+    return null;
+  }
+  if (form.months.length === 0) {
+    return null;
+  }
+  const body: RoutinePayload = {
+    title: form.title.trim(),
+    kind: form.kind,
+    category_id: form.category_id,
+    occurrence_type: form.occurrence_type,
+    adjust_excluded: form.adjust_excluded,
+    months: [...form.months].sort((left, right) => left - right),
+    exclusions: [],
+  };
+  if (form.detail.trim() !== "") {
+    body.detail = form.detail.trim();
+  }
+  if (form.occurrence_type === "date") {
+    body.date_rule = form.date_rule;
+    if (form.date_rule === "day_of_month") {
+      if (!Number.isInteger(form.day_of_month) || form.day_of_month < 1 || form.day_of_month > 31) {
+        return null;
+      }
+      body.day_of_month = form.day_of_month;
+    }
+  } else {
+    if (!Number.isInteger(form.weekday_n) || form.weekday_n < 1 || form.weekday_n > 5) {
+      return null;
+    }
+    body.weekday_rule = form.weekday_rule;
+    body.weekday_n = form.weekday_n;
+    body.weekday = form.weekday;
+  }
+  if (form.adjust_excluded) {
+    if (form.exclusions.length === 0) {
+      return null;
+    }
+    body.exclusions = [...form.exclusions];
+    body.shift_direction = form.shift_direction;
+  }
+  return body;
+}
+
+async function saveRoutine(): Promise<void> {
+  const body = routinePayload();
+  if (body === null) {
+    return;
+  }
+  busy.value = true;
+  formError.value = "";
+  try {
+    const form = routineForm.value;
+    const result =
+      form.id === null ? await createRoutine(body) : await updateRoutine(form.id, body);
+    if (result === "invalid") {
+      formError.value = "Invalid input";
+      return;
+    }
+    if (result === "missing") {
+      formError.value = "Not found";
+      return;
+    }
+    routineOpen.value = false;
+    flash("Saved");
+    await loadRoutines();
+  } catch (caught) {
+    if (!handle(caught)) {
+      formError.value = "Server error";
+    }
+  } finally {
+    busy.value = false;
+  }
+}
+
+async function confirmApply(): Promise<void> {
+  if (applyMode.value === "one") {
+    await applySelectedRoutine();
+  } else {
+    await applyEveryRoutine();
+  }
+}
+
+async function applySelectedRoutine(): Promise<void> {
+  if (selectedRoutineId.value === null) {
+    return;
+  }
+  busy.value = true;
+  error.value = "";
+  try {
+    const result = await applyRoutine(
+      selectedRoutineId.value,
+      applyYear.value,
+      applyMonthIndex.value + 1,
+    );
+    if (result === "invalid") {
+      error.value = "Invalid input";
+      return;
+    }
+    if (result === "missing") {
+      error.value = "Not found";
+      applyOpen.value = false;
+      await loadRoutines();
+      return;
+    }
+    applyOpen.value = false;
+    flash("Saved");
+    await loadMonth();
+  } catch (caught) {
+    if (!handle(caught)) {
+      error.value = "Server error";
+    }
+  } finally {
+    busy.value = false;
+  }
+}
+
+async function applyEveryRoutine(): Promise<void> {
+  busy.value = true;
+  error.value = "";
+  try {
+    const result = await applyAllRoutines(applyYear.value, applyMonthIndex.value + 1);
+    if (result === "invalid") {
+      error.value = "Invalid input";
+      return;
+    }
+    applyOpen.value = false;
+    flash("Saved");
+    await loadMonth();
+  } catch (caught) {
+    if (!handle(caught)) {
+      error.value = "Server error";
+    }
+  } finally {
     busy.value = false;
   }
 }
@@ -1050,9 +1370,7 @@ onMounted(async () => {
     },
   });
   setHolidaySettingsHandler(() => {
-    closeLeftover();
-    closeDayMenu();
-    settingsPanel.value = true;
+    void openSettings();
   });
   window.addEventListener("click", onWindowCloseDayMenu, true);
   window.addEventListener("contextmenu", onWindowCloseDayMenu, true);
@@ -1307,7 +1625,7 @@ onUnmounted(() => {
     </div>
 
     <div v-if="settingsPanel" class="overlay">
-      <div class="modal">
+      <div class="modal settings-modal">
         <h2>Settings</h2>
         <div class="settings-week">
           <p class="caption">Week starts</p>
@@ -1331,6 +1649,59 @@ onUnmounted(() => {
               Starts Monday
             </button>
           </div>
+        </div>
+        <div class="settings-routines">
+          <div class="section-head">
+            <h3>Routines</h3>
+            <button class="btn-text btn-icon" type="button" aria-label="New" :disabled="busy" @click="openRoutineAdd">
+              <img class="header-icon" :src="iconNew" alt="" />
+            </button>
+          </div>
+          <div class="apply-actions">
+            <button
+              class="btn-primary"
+              type="button"
+              :disabled="busy || selectedRoutineId === null"
+              @click="openApplyDialog('one')"
+            >
+              Apply
+            </button>
+            <button class="btn-secondary" type="button" :disabled="busy" @click="openApplyDialog('all')">
+              Apply all
+            </button>
+          </div>
+          <p v-if="routines.length === 0" class="caption">No data</p>
+          <ul v-else class="plain-list routine-list">
+            <li
+              v-for="item in routines"
+              :key="item.id"
+              class="cat-row"
+              :class="{ 'is-current': selectedRoutineId === item.id }"
+              @click="selectedRoutineId = item.id"
+            >
+              <span class="row-title">{{ item.title }}</span>
+              <span class="row-actions">
+                <button
+                  class="btn-text btn-icon-sm"
+                  type="button"
+                  aria-label="Edit"
+                  :disabled="busy"
+                  @click="openRoutineEdit(item, $event)"
+                >
+                  <img class="row-icon" :src="iconEdit" alt="" />
+                </button>
+                <button
+                  class="btn-text btn-icon-sm"
+                  type="button"
+                  aria-label="Delete"
+                  :disabled="busy"
+                  @click.stop="askDelete('routine', item.id)"
+                >
+                  <img class="row-icon" :src="iconTrash" alt="" />
+                </button>
+              </span>
+            </li>
+          </ul>
         </div>
         <div class="modal-actions">
           <button class="btn-secondary" type="button" @click="settingsPanel = false">Close</button>
@@ -1452,6 +1823,132 @@ onUnmounted(() => {
         <div class="modal-actions">
           <button class="btn-primary" type="button" :disabled="busy" @click="saveHoliday">Save</button>
           <button class="btn-secondary" type="button" :disabled="busy" @click="holidayOpen = false">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="routineOpen" class="overlay">
+      <div class="modal modal-wide">
+        <h2>{{ routineForm.id === null ? "New routine" : "Edit routine" }}</h2>
+        <p v-if="formError" class="msg-error">{{ formError }}</p>
+        <div class="form-grid">
+          <input v-model="routineForm.title" class="field" placeholder="Title" :disabled="busy" />
+          <select v-model="routineForm.category_id" class="field" :disabled="busy">
+            <option :value="null">Category</option>
+            <option v-for="item in activeCategories" :key="item.id" :value="item.id">
+              {{ item.name }}
+            </option>
+          </select>
+          <select v-model="routineForm.kind" class="field" :disabled="busy">
+            <option value="event">Event</option>
+            <option value="todo">TODO</option>
+          </select>
+          <select v-model="routineForm.occurrence_type" class="field" :disabled="busy">
+            <option value="date">By date</option>
+            <option value="weekday">By weekday</option>
+          </select>
+          <template v-if="routineForm.occurrence_type === 'date'">
+            <select v-model="routineForm.date_rule" class="field" :disabled="busy">
+              <option value="last_day">Last day of month</option>
+              <option value="day_of_month">Day of month</option>
+            </select>
+            <input
+              v-if="routineForm.date_rule === 'day_of_month'"
+              v-model.number="routineForm.day_of_month"
+              class="field"
+              type="number"
+              min="1"
+              max="31"
+              :disabled="busy"
+            />
+          </template>
+          <template v-else>
+            <select v-model="routineForm.weekday_rule" class="field" :disabled="busy">
+              <option value="nth">Nth weekday</option>
+              <option value="nth_from_last">Nth from last weekday</option>
+            </select>
+            <input
+              v-model.number="routineForm.weekday_n"
+              class="field"
+              type="number"
+              min="1"
+              max="5"
+              :disabled="busy"
+            />
+            <select v-model="routineForm.weekday" class="field" :disabled="busy">
+              <option v-for="item in ROUTINE_WEEKDAYS" :key="item.value" :value="item.value">
+                {{ item.label }}
+              </option>
+            </select>
+          </template>
+          <div class="check-grid">
+            <label v-for="item in ROUTINE_MONTHS" :key="item.n" class="check-row">
+              <input
+                type="checkbox"
+                :checked="routineForm.months.includes(item.n)"
+                :disabled="busy"
+                @change="toggleRoutineMonth(item.n)"
+              />
+              {{ item.label }}
+            </label>
+          </div>
+          <label class="check-row">
+            <input v-model="routineForm.adjust_excluded" type="checkbox" :disabled="busy" />
+            Adjust excluded days
+          </label>
+          <template v-if="routineForm.adjust_excluded">
+            <div class="check-grid">
+              <label v-for="item in ROUTINE_EXCLUSIONS" :key="item.value" class="check-row">
+                <input
+                  type="checkbox"
+                  :checked="routineForm.exclusions.includes(item.value)"
+                  :disabled="busy"
+                  @change="toggleRoutineExclusion(item.value)"
+                />
+                {{ item.label }}
+              </label>
+            </div>
+            <select v-model="routineForm.shift_direction" class="field" :disabled="busy">
+              <option value="earlier">Shift earlier</option>
+              <option value="later">Shift later</option>
+            </select>
+          </template>
+          <textarea v-model="routineForm.detail" class="field" placeholder="Details" :disabled="busy"></textarea>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-primary" type="button" :disabled="busy" @click="saveRoutine">Save</button>
+          <button class="btn-secondary" type="button" :disabled="busy" @click="routineOpen = false">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="applyOpen" class="overlay">
+      <div class="modal">
+        <h2>{{ applyMode === "all" ? "Apply all" : "Apply" }}</h2>
+        <div class="apply-month-row">
+          <button
+            class="btn-text btn-icon"
+            type="button"
+            aria-label="Prev"
+            :disabled="busy"
+            @click="shiftApplyMonth(-1)"
+          >
+            <img class="row-icon" :src="iconLeft" alt="" />
+          </button>
+          <span class="apply-month-label">{{ applyMonthText }}</span>
+          <button
+            class="btn-text btn-icon"
+            type="button"
+            aria-label="Next"
+            :disabled="busy"
+            @click="shiftApplyMonth(1)"
+          >
+            <img class="row-icon" :src="iconRight" alt="" />
+          </button>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-primary" type="button" :disabled="busy" @click="confirmApply">Apply</button>
+          <button class="btn-secondary" type="button" :disabled="busy" @click="applyOpen = false">Cancel</button>
         </div>
       </div>
     </div>
@@ -1794,6 +2291,7 @@ onUnmounted(() => {
 
 .settings-week {
   margin-bottom: calc(var(--space) * 2);
+  flex: none;
 }
 
 .settings-week .caption {
@@ -1815,6 +2313,69 @@ onUnmounted(() => {
   color: var(--color-primary);
 }
 
+.settings-modal {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  overflow-x: hidden;
+}
+
+.settings-modal > h2,
+.settings-modal > .modal-actions {
+  flex: none;
+}
+
+.settings-routines {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.apply-month-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space);
+  margin-bottom: var(--space);
+}
+
+.apply-month-label {
+  flex: 1;
+  text-align: center;
+}
+
+.apply-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space);
+  margin-bottom: var(--space);
+}
+
+.routine-list {
+  flex: 1;
+  min-height: 8rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.row-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cat-row.is-current {
+  color: var(--color-primary);
+}
+
+.check-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space);
+}
+
 .plain-list {
   list-style: none;
   margin: 0;
@@ -1826,6 +2387,7 @@ onUnmounted(() => {
   align-items: center;
   gap: var(--space);
   min-height: var(--tap);
+  min-width: 0;
   border-bottom: 1px solid var(--color-border);
   cursor: pointer;
 }
@@ -1891,6 +2453,10 @@ onUnmounted(() => {
   .month-bar-item.is-current {
     color: var(--color-primary);
     box-shadow: inset 0 -3px 0 var(--color-primary);
+  }
+
+  .check-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .grid {

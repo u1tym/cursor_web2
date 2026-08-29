@@ -57,6 +57,7 @@ export type ScheduleItem = {
   end_time: string | null;
   category_id: number;
   is_completed: boolean | null;
+  routine_id: number | null;
 };
 
 export type Preferences = {
@@ -355,5 +356,142 @@ export async function deleteUserHoliday(id: number): Promise<"ok" | "missing"> {
     return "missing";
   }
   throw new Error("user-holidays");
+}
+
+export type RoutineItem = {
+  id: number;
+  title: string;
+  detail: string | null;
+  kind: "event" | "todo";
+  category_id: number;
+  occurrence_type: "date" | "weekday";
+  date_rule: "last_day" | "day_of_month" | null;
+  day_of_month: number | null;
+  weekday_rule: "nth" | "nth_from_last" | null;
+  weekday_n: number | null;
+  weekday: "sunday" | "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | null;
+  adjust_excluded: boolean;
+  shift_direction: "earlier" | "later" | null;
+  months: number[];
+  exclusions: string[];
+};
+
+export type RoutinePayload = {
+  title: string;
+  detail?: string;
+  kind: "event" | "todo";
+  category_id: number;
+  occurrence_type: "date" | "weekday";
+  date_rule?: "last_day" | "day_of_month" | null;
+  day_of_month?: number | null;
+  weekday_rule?: "nth" | "nth_from_last" | null;
+  weekday_n?: number | null;
+  weekday?: RoutineItem["weekday"];
+  adjust_excluded: boolean;
+  shift_direction?: "earlier" | "later" | null;
+  months: number[];
+  exclusions: string[];
+};
+
+export async function getRoutines(): Promise<RoutineItem[]> {
+  const res = await apiFetch("/routines");
+  throwIfAuthFailed(res);
+  if (!res.ok) {
+    throw new Error("routines");
+  }
+  return ((await res.json()) as { items: RoutineItem[] }).items;
+}
+
+export async function createRoutine(
+  body: RoutinePayload,
+): Promise<RoutineItem | "invalid" | "missing"> {
+  const res = await apiFetch("/routines", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  throwIfAuthFailed(res);
+  if (res.status === 201) {
+    return (await res.json()) as RoutineItem;
+  }
+  if (res.status === 400) {
+    return "invalid";
+  }
+  if (res.status === 404) {
+    return "missing";
+  }
+  throw new Error("routines");
+}
+
+export async function updateRoutine(
+  id: number,
+  body: RoutinePayload,
+): Promise<RoutineItem | "invalid" | "missing"> {
+  const res = await apiFetch(`/routines/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+  throwIfAuthFailed(res);
+  if (res.status === 200) {
+    return (await res.json()) as RoutineItem;
+  }
+  if (res.status === 400) {
+    return "invalid";
+  }
+  if (res.status === 404) {
+    return "missing";
+  }
+  throw new Error("routines");
+}
+
+export async function deleteRoutine(id: number): Promise<"ok" | "missing"> {
+  const res = await apiFetch(`/routines/${id}`, { method: "DELETE" });
+  throwIfAuthFailed(res);
+  if (res.status === 204) {
+    return "ok";
+  }
+  if (res.status === 404) {
+    return "missing";
+  }
+  throw new Error("routines");
+}
+
+export async function applyRoutine(
+  id: number,
+  year: number,
+  month: number,
+): Promise<ScheduleItem[] | "invalid" | "missing"> {
+  const res = await apiFetch(`/routines/${id}/apply`, {
+    method: "POST",
+    body: JSON.stringify({ year, month }),
+  });
+  throwIfAuthFailed(res);
+  if (res.status === 200) {
+    return ((await res.json()) as { items: ScheduleItem[] }).items;
+  }
+  if (res.status === 400) {
+    return "invalid";
+  }
+  if (res.status === 404) {
+    return "missing";
+  }
+  throw new Error("routines");
+}
+
+export async function applyAllRoutines(
+  year: number,
+  month: number,
+): Promise<ScheduleItem[] | "invalid"> {
+  const res = await apiFetch("/routines/apply-all", {
+    method: "POST",
+    body: JSON.stringify({ year, month }),
+  });
+  throwIfAuthFailed(res);
+  if (res.status === 200) {
+    return ((await res.json()) as { items: ScheduleItem[] }).items;
+  }
+  if (res.status === 400) {
+    return "invalid";
+  }
+  throw new Error("routines");
 }
 

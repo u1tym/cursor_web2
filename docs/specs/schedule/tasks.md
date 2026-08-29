@@ -12,7 +12,7 @@
 
 関連要件:
 
-- REQ-001 〜 REQ-030
+- REQ-001 〜 REQ-040
 
 `portal` の Python は import しない。`public` の表は読むだけ（複製しない）。業務表はスキーマ `schedule`。本機能の機能マスタ登録と利用者への割当は、`portal` の運用コマンドで行う。
 
@@ -597,6 +597,315 @@ GET は行が無ければ初期値（日曜始まり、削除済みを出さな�
 
 ---
 
+## タスク 16
+
+### タイトル
+
+ルーチン表とスケジュールの `routine_id` の DDL を追加し、適用する
+
+### 見積もり
+
+2時間
+
+### 関連要件
+
+- REQ-004, REQ-031, REQ-032
+
+### 関連設計
+
+- `db-design.md` / テーブル設計（`routines`, `routine_months`, `routine_exclusions`, `schedules.routine_id`）
+- `design.md` / バックエンド設計 / モジュール構成（`sql/`）
+
+### 実装パス
+
+- `src/features/schedule/backend/sql/`
+
+### 内容
+
+`routines`、`routine_months`、`routine_exclusions` を作る。`schedules` に `routine_id`（NULL 可、既定 NULL、外部キー）と部分インデックスを足す。検査制約は `db-design.md` どおり。既存のスケジュール行は `routine_id` が NULL のまま。`public` の表は変えない。適用手順は既存の SQL 適用に合わせる。
+
+### 完了条件
+
+- [ ] `db-design.md` のルーチン関連の表・制約・インデックスが SQL にある
+- [ ] 既存の `schedules` に `routine_id` が付き、既存行は NULL
+- [ ] `tstuser` で tstdb に適用できる
+- [ ] `public` に業務表を増やしていない
+
+---
+
+## タスク 17
+
+### タイトル
+
+ルーチンと `routine_id` 付きスケジュールのデータアクセスを実装する
+
+### 見積もり
+
+3時間
+
+### 関連要件
+
+- REQ-002, REQ-004, REQ-007, REQ-008, REQ-031, REQ-032
+
+### 関連設計
+
+- `design.md` / バックエンド設計 / データアクセス
+- `db-design.md` / `schedule.routines`、`schedule.routine_months`、`schedule.routine_exclusions`、`schedule.schedules.routine_id`
+
+### 実装パス
+
+- `src/features/schedule/backend/app/repos.py`
+- `src/features/schedule/backend/app/services/schedule_service.py`
+
+### 内容
+
+ルーチンの未削除一覧、ID 取得、追加（反映月・除外対象を含む）、論理削除を実装する。スケジュールは `routine_id` を読み書きできる。手入力追加では `routine_id` を NULL にする。更新では `routine_id` を変えない。指定ユーザ・指定ルーチン・指定年月の開始日を持つ未削除の有無を確認できる。型ヒントを付ける。
+
+### 完了条件
+
+- [ ] ルーチンの一覧・追加・論理削除のアクセス関数がある
+- [ ] GET `/schedules` の応答に `routine_id` が含まれる（無いときは `null`）
+- [ ] POST `/schedules` が `routine_id` を付けない
+- [ ] PATCH `/schedules/{schedule_id}` が `routine_id` を変えない
+- [ ] 指定年月かつ指定 `routine_id` の未削除有無を確認できる
+
+---
+
+## タスク 18
+
+### タイトル
+
+ルーチンの一覧・追加・削除 API を実装する
+
+### 見積もり
+
+3時間
+
+### 関連要件
+
+- REQ-031, REQ-032, REQ-033, REQ-034, REQ-027
+
+### 関連設計
+
+- `design.md` / バックエンド設計 / 業務ロジック（ルーチン）
+- `api-design.md` / GET POST `/routines`、DELETE `/routines/{routine_id}`
+- `db-design.md` / `schedule.routines`、`schedule.routine_months`、`schedule.routine_exclusions`
+
+### 実装パス
+
+- `src/features/schedule/backend/app/services/routine_service.py`
+- `src/features/schedule/backend/app/routers/routines.py`
+- `src/features/schedule/tests/`
+
+### 内容
+
+未削除一覧（タイトル昇順）。追加は必須項目と適用日タイプに応じた項目、反映月 1 件以上、除外調整が有なら除外 1 件以上とずらしかた。カテゴリは本人の未削除のみ。削除は論理削除し、スケジュールの `routine_id` は変えない。入力不正は 400。他ユーザ・既削除は 404。操作をログへ出す。
+
+### 完了条件
+
+- [ ] GET が本人の未削除のみ
+- [ ] POST で追加でき、識別が付く。必須欠落は 400
+- [ ] 日付指定／曜日指定の項目組合せが不正なら 400
+- [ ] DELETE で論理削除。紐づくスケジュールは残る
+- [ ] 成功は INF、想定内の失敗は WRN
+
+---
+
+## タスク 19
+
+### タイトル
+
+ルーチン適用の基準日と適用日の算出を実装する
+
+### 見積もり
+
+3時間
+
+### 関連要件
+
+- REQ-038, REQ-039
+
+### 関連設計
+
+- `design.md` / バックエンド設計 / 業務ロジック（基準日・除外調整）
+- `db-design.md` / テーブルなし（算出）
+- `api-design.md` / 適用 API の処理概要
+
+### 実装パス
+
+- `src/features/schedule/backend/app/services/routine_service.py`
+- `src/features/schedule/tests/`
+
+### 内容
+
+指定年月と適用日タイプから基準日を決める。月末日、毎月 X 日（その月に無い日は無し）、N 番目の曜日、最終から N 番目の曜日。除外調整が有なら、祝日（`holiday_service`）と選んだ曜日に当たるあいだ 1 日ずつずらす。31 日上限。ユーザ休日は含めない。単体で確認する。
+
+### 完了条件
+
+- [ ] 月末日・毎月 X 日・第 N 曜日・最終から N 番目が設計どおり
+- [ ] その月に存在しない日・第 N 曜日は基準日なし
+- [ ] 除外調整の前ずらし・後ずらしができる。祝日除外は日本の祝日
+- [ ] 31 日ずらしても除外なら適用日なし
+- [ ] 実行時に外部ホストへ祝日を取りに行かない
+
+---
+
+## タスク 20
+
+### タイトル
+
+ルーチンの指定年月への適用 API を実装する
+
+### 見積もり
+
+3時間
+
+### 関連要件
+
+- REQ-036, REQ-037, REQ-038, REQ-039, REQ-027
+
+### 関連設計
+
+- `design.md` / バックエンド設計 / 業務ロジック（適用）
+- `api-design.md` / POST `/routines/{routine_id}/apply`、POST `/routines/apply-all`
+
+### 実装パス
+
+- `src/features/schedule/backend/app/services/routine_service.py`
+- `src/features/schedule/backend/app/routers/routines.py`
+- `src/features/schedule/tests/`
+
+### 内容
+
+1 件適用と一括適用。指定年月の月が反映月に無い、同一 `routine_id` が指定年月の開始日として既にある、基準日／適用日なし、カテゴリが使えない、ときは登録せず 200（`items` は空または他件のみ）。作るスケジュールは日単位、開始＝終了＝適用日、`routine_id` 付き。TODO は未実施。一括は未削除すべてを独立に処理。操作と登録しなかった理由をログへ出す。
+
+### 完了条件
+
+- [ ] 1 件適用でスケジュールが作れ、`routine_id` が付く
+- [ ] 同じ年月へ再適用すると登録せず 200
+- [ ] 反映月外は登録しない
+- [ ] 一括適用で、ある件が登録しなくても他件を続ける
+- [ ] `year` / `month` 不正は 400。無いルーチンは 404
+- [ ] 操作がログに残る
+
+---
+
+## タスク 21
+
+### タイトル
+
+設定ダイアログのルーチン一覧・追加・削除・適用を実装する
+
+### 見積もり
+
+4時間
+
+### 関連要件
+
+- REQ-021, REQ-033, REQ-034, REQ-035, REQ-036, REQ-037
+
+### 関連設計
+
+- `ui-design.md` / SCR-001（設定ダイアログ、ルーチン入力）
+- `api-design.md` / `/routines`
+
+### 実装パス
+
+- `src/features/schedule/frontend/` の設定ダイアログとルーチン入力
+
+### 内容
+
+設定ダイアログに Routines 一覧を置く。新規でルーチン入力を開く。行選択と Apply、Apply all。適用する年月の初期値は表示対象月（カレンダーの月は変えない）。削除は確認のあと。送信前に必須と項目組合せを確認する。成功なら一覧とカレンダーを読み直す。設定ダイアログは残す。文言は英語。外側クリックでは閉じない。ルーチン識別は出さない。
+
+### 完了条件
+
+- [ ] 設定からルーチン一覧・追加・削除ができる
+- [ ] 選んだ 1 件の適用と全件適用ができる
+- [ ] 適用する年月を指定でき、カレンダーの表示月は変えない
+- [ ] 必須欠落は送らない
+- [ ] PC とスマートフォンで同じ設定ダイアログから操作できる
+
+---
+
+## タスク 22
+
+### タイトル
+
+ルーチンの更新 API を実装する
+
+### 見積もり
+
+3時間
+
+### 関連要件
+
+- REQ-032, REQ-040, REQ-027
+
+### 関連設計
+
+- `design.md` / バックエンド設計 / 業務ロジック（ルーチン更新）
+- `api-design.md` / PATCH `/routines/{routine_id}`
+- `db-design.md` / `schedule.routines`、`schedule.routine_months`、`schedule.routine_exclusions`
+
+### 実装パス
+
+- `src/features/schedule/backend/app/repos.py`
+- `src/features/schedule/backend/app/services/routine_service.py`
+- `src/features/schedule/backend/app/routers/routines.py`
+- `src/features/schedule/tests/`
+
+### 内容
+
+未削除かつ本人のルーチンの項目を更新する。検証は追加と同じ。反映月と除外対象は置き換える。紐づくスケジュールは変えない。識別は変えない。入力不正は 400。他ユーザ・既削除は 404。操作をログへ出す。
+
+### 完了条件
+
+- [ ] PATCH で項目を更新できる
+- [ ] 必須欠落・項目組合せ不正は 400
+- [ ] 紐づくスケジュールの内容と `routine_id` は変わらない
+- [ ] 無い／論理削除済み／他ユーザは 404
+- [ ] 成功は INF、想定内の失敗は WRN
+
+---
+
+## タスク 23
+
+### タイトル
+
+設定ダイアログのルーチン編集・適用年月ダイアログ・横スクロール解消を実装する
+
+### 見積もり
+
+3時間
+
+### 関連要件
+
+- REQ-035, REQ-036, REQ-037, REQ-040
+
+### 関連設計
+
+- `ui-design.md` / SCR-001（設定ダイアログ、ルーチン入力、適用する年月）
+- `api-design.md` / PATCH `/routines/{routine_id}`、適用 API
+
+### 実装パス
+
+- `src/features/schedule/frontend/` の設定ダイアログとルーチン入力
+
+### 内容
+
+一覧に編集アイコンを置く（削除へ寄せる）。編集は対象の項目でルーチン入力を開く。見出しは「Edit routine」。保存は更新。Apply / Apply all は一覧に年月を出さず、押すと適用する年月ダイアログを出す。初期値は表示対象月。実行はダイアログの「Apply」。設定ダイアログは残す。設定ダイアログとルーチン入力は横方向にスクロールしない。タイトルが長いときは省略する。
+
+### 完了条件
+
+- [ ] 一覧から編集でき、保存すると一覧が更新される
+- [ ] 設定の Routines に年月は出ない
+- [ ] Apply / Apply all で年月指定が出て、実行すると適用する
+- [ ] カレンダーの表示月は変えない
+- [ ] 設定ダイアログとルーチン入力に横スクロールが出ない
+- [ ] PC とスマートフォンで同じ操作ができる
+
+---
+
 ## テスト
 
 ### 単体テスト
@@ -604,10 +913,11 @@ GET は行が無ければ初期値（日曜始まり、削除済みを出さな�
 - [ ] `src/features/schedule/tests/` に配置する
 - [ ] 開始終了の前後、日単位／時間単位、種別と実施状態、カテゴリ名称重複、ユーザ休日の年月日重複、並び順、期間重なりを確認する
 - [ ] 祝日算出が外部通信しないこと、振替休日を含むことを確認する
+- [ ] ルーチンの適用日タイプ、基準日、除外調整のずらし、指定年月の同一 `routine_id` では登録しないことを確認する
 
 ### 結合テスト
 
-- [ ] 当該機能の uvicorn に対する API テスト（Cookie、401、403、409、settings、期間取得）
+- [ ] 当該機能の uvicorn に対する API テスト（Cookie、401、403、409、settings、期間取得、ルーチンの追加・更新・削除・適用）
 - [ ] 操作ログ（入力・判断・失敗理由、セッション ID 非出力）
 
 ### 受け入れテスト
@@ -631,3 +941,7 @@ GET は行が無ければ初期値（日曜始まり、削除済みを出さな�
 | 2026-08-29 21:32 | 未承認 | その月の日が無い週は出さない |
 | 2026-08-29 22:42 | 未承認 | ユーザ休日は日の右クリックで追加・削除。設定ダイアログから祝日登録を外す |
 | 2026-08-29 22:52 | 承認済み | ユーザ休日の日右クリック追加・削除、設定ダイアログから祝日登録を外す変更を承認 |
+| 2026-08-29 23:46 | 未承認 | ルーチンの DDL・API・適用算出・設定ダイアログ（タスク 16〜21） |
+| 2026-08-29 23:50 | 承認済み | ルーチンのタスク 16〜21 を承認 |
+| 2026-08-30 00:17 | 未承認 | ルーチン更新 API と、編集・適用年月ダイアログ・横スクロール解消（タスク 22〜23） |
+| 2026-08-30 00:23 | 承認済み | タスク 22〜23 を承認 |

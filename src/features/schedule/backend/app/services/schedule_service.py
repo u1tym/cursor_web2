@@ -92,6 +92,7 @@ def _body(row: ScheduleRow) -> dict[str, object]:
         "end_time": format_time(row.end_time),
         "category_id": row.category_id,
         "is_completed": row.is_completed,
+        "routine_id": row.routine_id,
     }
 
 
