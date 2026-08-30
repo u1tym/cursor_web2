@@ -12,6 +12,7 @@ class UserRow:
     id: int
     username: str
     password_hash: str
+    email: str
     is_deleted: bool
 
 
@@ -54,6 +55,7 @@ def _user_from_row(row: dict[str, object]) -> UserRow:
         id=int(row["id"]),
         username=str(row["username"]),
         password_hash=str(row["password_hash"]),
+        email=str(row["email"]),
         is_deleted=bool(row["is_deleted"]),
     )
 
@@ -74,7 +76,7 @@ def list_active_users() -> list[UserRow]:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, username, password_hash, is_deleted
+                SELECT id, username, password_hash, email, is_deleted
                 FROM public.users
                 WHERE is_deleted = false
                 ORDER BY username
@@ -88,7 +90,7 @@ def get_user_by_username(username: str) -> UserRow | None:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, username, password_hash, is_deleted
+                SELECT id, username, password_hash, email, is_deleted
                 FROM public.users
                 WHERE username = %s
                 """,
@@ -103,7 +105,7 @@ def get_user_by_id(user_id: int) -> UserRow | None:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, username, password_hash, is_deleted
+                SELECT id, username, password_hash, email, is_deleted
                 FROM public.users
                 WHERE id = %s
                 """,
@@ -113,42 +115,42 @@ def get_user_by_id(user_id: int) -> UserRow | None:
             return _user_from_row(row) if row else None
 
 
-def insert_user(username: str, password_hash: str) -> UserRow:
+def insert_user(username: str, password_hash: str, email: str = "") -> UserRow:
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO public.users (username, password_hash)
-                VALUES (%s, %s)
-                RETURNING id, username, password_hash, is_deleted
+                INSERT INTO public.users (username, password_hash, email)
+                VALUES (%s, %s, %s)
+                RETURNING id, username, password_hash, email, is_deleted
                 """,
-                (username, password_hash),
+                (username, password_hash, email),
             )
             row = cur.fetchone()
             assert row is not None
             return _user_from_row(row)
 
 
-def update_user(user_id: int, username: str, password_hash: str | None) -> None:
+def update_user(user_id: int, username: str, email: str, password_hash: str | None) -> None:
     with get_conn() as conn:
         with conn.cursor() as cur:
             if password_hash is None:
                 cur.execute(
                     """
                     UPDATE public.users
-                    SET username = %s
+                    SET username = %s, email = %s
                     WHERE id = %s AND is_deleted = false
                     """,
-                    (username, user_id),
+                    (username, email, user_id),
                 )
             else:
                 cur.execute(
                     """
                     UPDATE public.users
-                    SET username = %s, password_hash = %s
+                    SET username = %s, email = %s, password_hash = %s
                     WHERE id = %s AND is_deleted = false
                     """,
-                    (username, password_hash, user_id),
+                    (username, email, password_hash, user_id),
                 )
 
 

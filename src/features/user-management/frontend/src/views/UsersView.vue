@@ -11,8 +11,18 @@ const success = ref("");
 const mode = ref<"list" | "create" | "edit">("list");
 const selected = ref<UserItem | null>(null);
 const username = ref("");
+const email = ref("");
 const password = ref("");
+const invalidUsername = ref(false);
+const invalidEmail = ref(false);
+const invalidPassword = ref(false);
 const confirmId = ref<number | null>(null);
+
+function emailOk(value: string): boolean {
+  const trimmed = value.trim();
+  const at = trimmed.indexOf("@");
+  return at > 0 && at < trimmed.length - 1;
+}
 
 onMounted(() => {
   void reload();
@@ -46,42 +56,58 @@ function startCreate(): void {
   mode.value = "create";
   selected.value = null;
   username.value = "";
+  email.value = "";
   password.value = "";
+  invalidUsername.value = false;
+  invalidEmail.value = false;
+  invalidPassword.value = false;
 }
 
 function startEdit(item: UserItem): void {
   mode.value = "edit";
   selected.value = item;
   username.value = item.username;
+  email.value = item.email;
   password.value = "";
+  invalidUsername.value = false;
+  invalidEmail.value = false;
+  invalidPassword.value = false;
 }
 
 function cancel(): void {
   mode.value = "list";
   selected.value = null;
   username.value = "";
+  email.value = "";
   password.value = "";
+  invalidUsername.value = false;
+  invalidEmail.value = false;
+  invalidPassword.value = false;
 }
 
 async function save(): Promise<void> {
   error.value = "";
   success.value = "";
-  if (username.value.trim() === "") {
-    return;
-  }
-  if (mode.value === "create" && password.value === "") {
+  const nameBlank = username.value.trim() === "";
+  const mailBlank = email.value.trim() === "";
+  const mailBad = !emailOk(email.value);
+  const passwordBlank = mode.value === "create" && password.value === "";
+  invalidUsername.value = nameBlank;
+  invalidEmail.value = mailBlank || mailBad;
+  invalidPassword.value = passwordBlank;
+  if (nameBlank || mailBlank || mailBad || passwordBlank) {
     return;
   }
   loading.value = true;
   try {
     if (mode.value === "create") {
-      const result = await createUser(username.value, password.value);
+      const result = await createUser(username.value, password.value, email.value);
       if (result === "invalid" || result === "conflict") {
         error.value = result === "invalid" ? "入力が不正です" : "保存できませんでした";
         return;
       }
     } else if (selected.value) {
-      const result = await updateUser(selected.value.id, username.value, password.value);
+      const result = await updateUser(selected.value.id, username.value, password.value, email.value);
       if (result === "invalid" || result === "missing" || result === "conflict") {
         error.value = result === "invalid" ? "入力が不正です" : result === "missing" ? "対象がありません" : "保存できませんでした";
         return;
@@ -141,12 +167,16 @@ async function confirmDelete(): Promise<void> {
           <thead>
             <tr>
               <th>ユーザ名</th>
+              <th>メールアドレス</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="item in items" :key="item.id" :class="{ selected: selected?.id === item.id }">
               <td>
                 <button class="row" type="button" @click="startEdit(item)">{{ item.username }}</button>
+              </td>
+              <td>
+                <button class="row" type="button" @click="startEdit(item)">{{ item.email }}</button>
               </td>
             </tr>
           </tbody>
@@ -155,12 +185,30 @@ async function confirmDelete(): Promise<void> {
     </section>
     <section v-if="mode !== 'list'" class="panel form-panel">
       <form class="form" @submit.prevent="save">
-        <input v-model="username" type="text" placeholder="ユーザ名" aria-label="ユーザ名" :disabled="loading" required />
+        <input
+          v-model="username"
+          type="text"
+          placeholder="ユーザ名"
+          aria-label="ユーザ名"
+          :class="{ invalid: invalidUsername }"
+          :disabled="loading"
+          required
+        />
+        <input
+          v-model="email"
+          type="text"
+          placeholder="メールアドレス"
+          aria-label="メールアドレス"
+          :class="{ invalid: invalidEmail }"
+          :disabled="loading"
+          required
+        />
         <input
           v-model="password"
           type="password"
           :placeholder="mode === 'create' ? 'パスワード' : '空なら変更しない'"
           aria-label="パスワード"
+          :class="{ invalid: invalidPassword }"
           :disabled="loading"
           :required="mode === 'create'"
         />

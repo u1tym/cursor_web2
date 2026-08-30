@@ -39,6 +39,7 @@ GET `/settings` だけ認証不要。それ以外は認証要かつ本機能の�
 - `weekday` は `sunday`〜`saturday`
 - `shift_direction` は `earlier`（前）または `later`（後）
 - `exclusion_kind` は `holiday`、`sunday`、`monday`、`tuesday`、`wednesday`、`thursday`、`friday`、`saturday`
+- `needs_notification` は `true`（要）または `false`（不要）
 - 色は `#` に続く 16 進 6 桁（例: `#4DA3FF`）
 
 ### エラー（共通）
@@ -145,13 +146,14 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026、REQ-035 の画面配置は画�
       "end_time": null,
       "category_id": 1,
       "is_completed": null,
-      "routine_id": null
+      "routine_id": null,
+      "needs_notification": false
     }
   ]
 }
 ```
 
-`location` と `detail` は無いとき `null`。日単位のとき `start_time` と `end_time` は `null`。予定のとき `is_completed` は `null`。TODO のとき `true` または `false`。`routine_id` は手入力なら `null`。適用で作ったものはルーチンの `id`。
+`location` と `detail` は無いとき `null`。日単位のとき `start_time` と `end_time` は `null`。予定のとき `is_completed` は `null`。TODO のとき `true` または `false`。`routine_id` は手入力なら `null`。適用で作ったものはルーチンの `id`。`needs_notification` は要なら `true`、不要なら `false`。
 
 `items` は REQ-019 の順。範囲に重なる本人の未削除だけ。カテゴリの表示／非表示では落とさない。0 件なら空配列。
 
@@ -183,11 +185,12 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026、REQ-035 の画面配置は画�
   "end_date": "2026-08-27",
   "start_time": "09:00",
   "end_time": "10:00",
-  "category_id": 1
+  "category_id": 1,
+  "needs_notification": false
 }
 ```
 
-`location` と `detail` は省略可。空または省略なら `null` として保存する。日単位のとき `start_time` と `end_time` は省略するか `null`。時間単位のときは必須。`is_completed` は受け付けない。TODO は未実施で作る。`routine_id` は受け付けない。常に無しで作る。
+`location` と `detail` は省略可。空または省略なら `null` として保存する。日単位のとき `start_time` と `end_time` は省略するか `null`。時間単位のときは必須。`needs_notification` は必須。要なら `true`、不要なら `false`。`is_completed` は受け付けない。TODO は未実施で作る。`routine_id` は受け付けない。常に無しで作る。
 
 応答: 201。GET 一件と同じ形。
 
@@ -197,7 +200,7 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026、REQ-035 の画面配置は画�
 
 | 状況 | 応答 |
 |------|------|
-| 必須項目が無い／空、粒度と時刻の組合せが不正、終了が開始より前 | 400 |
+| 必須項目が無い／空、粒度と時刻の組合せが不正、終了が開始より前、`needs_notification` が無いまたは真偽でない | 400 |
 | 未ログイン | 401 |
 | 権限なし | 403 |
 | カテゴリが無い／論理削除済み／他ユーザ | 404 |
@@ -207,7 +210,7 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026、REQ-035 の画面配置は画�
 - 認証: 要
 - 対応 REQ: REQ-008
 
-要求: POST と同じ項目。すべて必須（`location` と `detail` は空可）。`kind` を予定から TODO にするときは未実施にする。TODO から予定にするときは実施状態を捨てる。更新時の `is_completed` は受け付けない（実施状態は completion で変える。種別変更に伴う未実施化は本 API が行う）。`routine_id` は受け付けない。既存の値は変えない。
+要求: POST と同じ項目。すべて必須（`location` と `detail` は空可）。`needs_notification` は必須。`kind` を予定から TODO にするときは未実施にする。TODO から予定にするときは実施状態を捨てる。更新時の `is_completed` は受け付けない（実施状態は completion で変える。種別変更に伴う未実施化は本 API が行う）。`routine_id` は受け付けない。既存の値は変えない。
 
 応答: 200。GET 一件と同じ形。
 
@@ -217,7 +220,7 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026、REQ-035 の画面配置は画�
 
 | 状況 | 応答 |
 |------|------|
-| 必須項目が無い／空、粒度と時刻の組合せが不正、終了が開始より前 | 400 |
+| 必須項目が無い／空、粒度と時刻の組合せが不正、終了が開始より前、`needs_notification` が無いまたは真偽でない | 400 |
 | 未ログイン | 401 |
 | 権限なし | 403 |
 | スケジュールまたは指定カテゴリが無い／論理削除済み／他ユーザ | 404 |
@@ -614,6 +617,7 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026、REQ-035 の画面配置は画�
       "weekday": null,
       "adjust_excluded": false,
       "shift_direction": null,
+      "needs_notification": false,
       "months": [1, 4, 7, 10],
       "exclusions": ["holiday", "sunday"]
     }
@@ -621,7 +625,7 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026、REQ-035 の画面配置は画�
 }
 ```
 
-本人の未削除のみ。`title` の昇順、同じなら `id` の昇順。0 件なら空配列。`detail` は無いとき `null`。日付指定のとき `weekday_rule` / `weekday_n` / `weekday` は `null`。`date_rule` が `last_day` のとき `day_of_month` は `null`。曜日指定のとき `date_rule` / `day_of_month` は `null`。除外調整が無のとき `shift_direction` は `null`、`exclusions` は空配列。`months` は 1〜12 の配列（重複なし、昇順）。
+本人の未削除のみ。`title` の昇順、同じなら `id` の昇順。0 件なら空配列。`detail` は無いとき `null`。日付指定のとき `weekday_rule` / `weekday_n` / `weekday` は `null`。`date_rule` が `last_day` のとき `day_of_month` は `null`。曜日指定のとき `date_rule` / `day_of_month` は `null`。除外調整が無のとき `shift_direction` は `null`、`exclusions` は空配列。`months` は 1〜12 の配列（重複なし、昇順）。`needs_notification` は要なら `true`、不要なら `false`。
 
 処理概要: 本人の未削除ルーチンを返す。
 
@@ -653,12 +657,13 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026、REQ-035 の画面配置は画�
   "weekday": null,
   "adjust_excluded": true,
   "shift_direction": "earlier",
+  "needs_notification": false,
   "months": [1, 4, 7, 10],
   "exclusions": ["holiday", "sunday"]
 }
 ```
 
-`detail` は省略可。空または省略なら `null`。日付指定のとき `date_rule` は必須。`last_day` なら `day_of_month` は省略または `null`。`day_of_month` なら 1〜31。曜日の項目は省略または `null`。曜日指定のとき `weekday_rule`、`weekday_n`（1〜5）、`weekday` は必須。日付の項目は省略または `null`。`months` は 1〜12 を 1 件以上（重複不可）。除外調整が無のとき `shift_direction` は省略または `null`、`exclusions` は省略または空配列。有のとき `shift_direction` は必須、`exclusions` は 1 件以上。
+`detail` は省略可。空または省略なら `null`。日付指定のとき `date_rule` は必須。`last_day` なら `day_of_month` は省略または `null`。`day_of_month` なら 1〜31。曜日の項目は省略または `null`。曜日指定のとき `weekday_rule`、`weekday_n`（1〜5）、`weekday` は必須。日付の項目は省略または `null`。`months` は 1〜12 を 1 件以上（重複不可）。除外調整が無のとき `shift_direction` は省略または `null`、`exclusions` は省略または空配列。有のとき `shift_direction` は必須、`exclusions` は 1 件以上。`needs_notification` は必須。要なら `true`、不要なら `false`。
 
 応答: 201。GET 一件と同じ形。
 
@@ -668,7 +673,7 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026、REQ-035 の画面配置は画�
 
 | 状況 | 応答 |
 |------|------|
-| 必須項目が無い／空、適用日タイプと項目の組合せが不正、`months` が 0 件または範囲外、除外調整が有なのに除外 0 件またはずらしかたが無い | 400 |
+| 必須項目が無い／空、適用日タイプと項目の組合せが不正、`months` が 0 件または範囲外、除外調整が有なのに除外 0 件またはずらしかたが無い、`needs_notification` が無いまたは真偽でない | 400 |
 | 未ログイン | 401 |
 | 権限なし | 403 |
 | カテゴリが無い／論理削除済み／他ユーザ | 404 |
@@ -688,7 +693,7 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026、REQ-035 の画面配置は画�
 
 | 状況 | 応答 |
 |------|------|
-| 必須項目が無い／空、適用日タイプと項目の組合せが不正、`months` が 0 件または範囲外、除外調整が有なのに除外 0 件またはずらしかたが無い | 400 |
+| 必須項目が無い／空、適用日タイプと項目の組合せが不正、`months` が 0 件または範囲外、除外調整が有なのに除外 0 件またはずらしかたが無い、`needs_notification` が無いまたは真偽でない | 400 |
 | 未ログイン | 401 |
 | 権限なし | 403 |
 | 対象なし、既に論理削除済み、他ユーザ | 404 |
@@ -747,13 +752,14 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026、REQ-035 の画面配置は画�
       "end_time": null,
       "category_id": 1,
       "is_completed": null,
-      "routine_id": 1
+      "routine_id": 1,
+      "needs_notification": false
     }
   ]
 }
 ```
 
-作ったスケジュールは GET `/schedules` 一件と同じ形。日単位。開始と終了は適用日。場所は `null`。TODO なら `is_completed` は `false`。`routine_id` は当該ルーチンの `id`。登録しなかったときは `items` は空配列（200 のまま）。
+作ったスケジュールは GET `/schedules` 一件と同じ形。日単位。開始と終了は適用日。場所は `null`。TODO なら `is_completed` は `false`。`routine_id` は当該ルーチンの `id`。`needs_notification` はルーチンの値。登録しなかったときは `items` は空配列（200 のまま）。
 
 処理概要: 指定年月に当該ルーチンを適用する。反映月に含まれない、指定年月に同一 `routine_id` の未削除がある、基準日または適用日を決められない、カテゴリが論理削除済みまたは本人のものでない、ときは登録しない。失敗にはしない。基準日・適用日の決め方は `design.md`。
 
@@ -792,11 +798,11 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026、REQ-035 の画面配置は画�
 | REQ-001 | 共通の認証。GET `/settings`。各操作 API の 401 / 403 |
 | REQ-002 | 各 GET が本人分のみ。他ユーザは 404 |
 | REQ-003 | POST/PATCH `/schedules` の `kind` と `is_completed` |
-| REQ-004 | スケジュールの要求・応答項目。`routine_id` は応答のみ |
+| REQ-004 | スケジュールの要求・応答項目。`routine_id` は応答のみ。`needs_notification` は要／不要 |
 | REQ-005 | `granularity` と日付／時刻 |
 | REQ-006 | 終了が開始より前は 400 |
-| REQ-007 | POST `/schedules`。`routine_id` は受け付けない |
-| REQ-008 | PATCH `/schedules/{schedule_id}`。`routine_id` は変えない |
+| REQ-007 | POST `/schedules`。`routine_id` は受け付けない。`needs_notification` は必須 |
+| REQ-008 | PATCH `/schedules/{schedule_id}`。`routine_id` は変えない。`needs_notification` は変えられる |
 | REQ-009 | DELETE `/schedules/{schedule_id}` |
 | REQ-010 | PATCH `/schedules/{schedule_id}/completion` |
 | REQ-011 | GET/POST `/categories` |
@@ -815,11 +821,11 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026、REQ-035 の画面配置は画�
 | REQ-029 | PATCH `/user-holidays/{user_holiday_id}` |
 | REQ-030 | DELETE `/user-holidays/{user_holiday_id}` |
 | REQ-031 | GET/POST `/routines` の `id` |
-| REQ-032 | GET/POST/PATCH `/routines` の項目 |
+| REQ-032 | GET/POST/PATCH `/routines` の項目。`needs_notification` を含む |
 | REQ-033 | POST `/routines` |
 | REQ-034 | DELETE `/routines/{routine_id}` |
 | REQ-035 | GET `/routines`。画面配置は `ui-design.md` |
-| REQ-036 | POST `/routines/{routine_id}/apply` |
+| REQ-036 | POST `/routines/{routine_id}/apply`。`needs_notification` はルーチンの値 |
 | REQ-037 | POST `/routines/apply-all` |
 | REQ-038 | 適用 API の基準日算出（専用パスなし） |
 | REQ-039 | 適用 API の除外調整（専用パスなし） |
@@ -841,3 +847,5 @@ REQ-003〜REQ-006、REQ-016、REQ-021〜REQ-026、REQ-035 の画面配置は画�
 | 2026-08-29 23:46 | 承認済み | ルーチン API とスケジュールの `routine_id` を承認 |
 | 2026-08-30 00:17 | 未承認 | PATCH `/routines/{routine_id}`（項目更新。紐づくスケジュールは変えない） |
 | 2026-08-30 00:23 | 承認済み | PATCH `/routines/{routine_id}` を承認 |
+| 2026-08-30 08:01 | 未承認 | スケジュールとルーチンの要求・応答に `needs_notification` を追加。適用時はルーチンの値 |
+| 2026-08-30 08:02 | 承認済み | スケジュールとルーチンの `needs_notification` を承認 |

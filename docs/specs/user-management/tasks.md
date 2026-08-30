@@ -14,7 +14,7 @@
 
 - REQ-001 〜 REQ-013
 
-`portal` の Python は import しない。表は `public` の既存を使う。DDL は作らない。本機能の機能マスタ登録と最初の運用者への割当は、`portal` の運用コマンドで行う。
+`portal` の Python は import しない。表は `public` の既存を使う。本機能の固有 DDL は作らない。`public.users.email` の列追加は `portal` の DDL で行う（タスク 11）。本機能の機能マスタ登録と最初の運用者への割当は、`portal` の運用コマンドで行う。
 
 ---
 
@@ -405,17 +405,134 @@ Cookie `session_id` でログイン中ユーザを特定する。未ログイン
 
 ---
 
+## タスク 11
+
+### タイトル
+
+`public.users` に `email` の DDL を追加し、適用する
+
+### 見積もり
+
+1時間
+
+### 関連要件
+
+- REQ-002, REQ-003, REQ-004
+
+### 関連設計
+
+- `db-design.md` / `public.users`（`email`）
+- `design.md` / 構成（DDL は portal）
+
+### 実装パス
+
+- `src/features/portal/backend/sql/01_public.sql`
+- `src/features/portal/backend/sql/`（既存 DB 向けの ALTER）
+
+### 内容
+
+`public.users` に `email`（varchar(255)、NOT NULL、既定 `''`）を足す。一意制約は付けない。形式の検査制約は置かない。既存行は空文字。`CREATE TABLE IF NOT EXISTS` では列は増えないため、既存 DB には `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` を適用する。本機能の `sql/` には置かない。
+
+### 完了条件
+
+- [ ] `public.users.email` がある
+- [ ] 既存行は空文字
+- [ ] 一意制約が無い
+- [ ] `tstuser` で tstdb に適用できる
+- [ ] 本機能の `sql/` を増やしていない
+
+---
+
+## タスク 12
+
+### タイトル
+
+ユーザ API に `email` を載せる
+
+### 見積もり
+
+2時間
+
+### 関連要件
+
+- REQ-002, REQ-003, REQ-004, REQ-013
+
+### 関連設計
+
+- `design.md` / バックエンド設計 / 業務ロジック（ユーザ）
+- `api-design.md` / GET POST `/users`、PATCH `/users/{user_id}`
+- `db-design.md` / `public.users.email`
+
+### 実装パス
+
+- `src/features/user-management/backend/app/repos.py`
+- `src/features/user-management/backend/app/services/user_service.py`
+- `src/features/user-management/backend/app/routers/users.py`
+- `src/features/user-management/tests/`
+
+### 内容
+
+GET/POST `/users` と PATCH `/users/{user_id}` に `email` を載せる。一覧・追加・更新の応答に含める。パスワードは出さない。POST と PATCH で必須。空、または `@` の前後に文字が無いときは 400。一意は要求しない。ログインには使わない。操作ログにメールアドレスの入力を残す。パスワードはログに出さない。
+
+### 完了条件
+
+- [ ] GET `/users` の各件に `email` がある。パスワードは無い
+- [ ] POST で `email` を保存できる。無い／空・形式不正は 400
+- [ ] PATCH で `email` を更新できる。無い／空・形式不正は 400
+- [ ] 同じメールアドレスのユーザを複数登録できる
+- [ ] 成功は INF、想定内の失敗は WRN。入力に `email` が含まれる。パスワードがログに無い
+
+---
+
+## タスク 13
+
+### タイトル
+
+ユーザ画面にメールアドレスの表示と入力を付ける
+
+### 見積もり
+
+2時間
+
+### 関連要件
+
+- REQ-002, REQ-003, REQ-004
+
+### 関連設計
+
+- `ui-design.md` / SCR-001 ユーザ
+- `api-design.md` / `/users`
+
+### 実装パス
+
+- `src/features/user-management/frontend/src/views/UsersView.vue`
+- `src/features/user-management/frontend/src/api.ts`
+
+### 内容
+
+一覧にメールアドレス列を出す。入力はユーザ名の下、パスワードの上。プレースホルダ「メールアドレス」。追加時は必須。編集時は行の値を入れる。空、または `@` の前後に文字が無ければ送信しない。Enter でも保存する。パスワードは一覧に出さない。
+
+### 完了条件
+
+- [ ] 一覧にユーザ名とメールアドレスが出る。パスワードは出ない
+- [ ] 追加・更新でメールアドレスを入力できる
+- [ ] 空または形式不正では送信しない
+- [ ] ブラウザで追加・更新を確認できる
+
+---
+
 ## テスト
 
 ### 単体テスト
 
 - [ ] `src/features/user-management/tests/` に配置する
 - [ ] 自己削除禁止、本機能削除禁止、自己からの本機能割当解除禁止、重複、論理削除済み対象、パスワード非出力を確認する
+- [ ] メールアドレスの必須、空、形式不正、一覧への出力を確認する
 
 ### 結合テスト
 
 - [ ] 当該機能の uvicorn に対する API テスト（Cookie、401、403、409、settings）
-- [ ] 操作ログ（入力・判断・失敗理由、パスワード非出力）
+- [ ] 操作ログ（入力・判断・失敗理由、パスワード非出力、メールアドレスの入力）
 
 ### 受け入れテスト
 
@@ -432,3 +549,5 @@ Cookie `session_id` でログイン中ユーザを特定する。未ログイン
 | 2026-08-29 18:21 | 未承認 | 公開パスの基点を `/portal_user_management/` にする |
 | 2026-08-29 18:29 | 未承認 | dist の配置先を `features/user-management/` にする |
 | 2026-08-29 19:19 | 承認済み | 公開パス `/portal_user_management/` と dist 配置の改訂を承認 |
+| 2026-08-30 08:26 | 未承認 | メールアドレス（タスク 11〜13）。DDL・API・画面 |
+| 2026-08-30 08:27 | 承認済み | タスク 11〜13 を承認 |

@@ -61,6 +61,7 @@ def _body(row: RoutineRow) -> dict[str, object]:
         "weekday": row.weekday,
         "adjust_excluded": row.adjust_excluded,
         "shift_direction": row.shift_direction,
+        "needs_notification": row.needs_notification,
         "months": list(row.months),
         "exclusions": list(row.exclusions),
     }
@@ -273,6 +274,7 @@ def add_routine(
     weekday: str | None,
     adjust_excluded: bool,
     shift_direction: str | None,
+    needs_notification: bool,
     months: list[int],
     exclusions: list[str],
 ) -> dict[str, object]:
@@ -283,7 +285,7 @@ def add_routine(
         f"date_rule={date_rule} day_of_month={day_of_month} weekday_rule={weekday_rule} "
         f"weekday_n={weekday_n} weekday={weekday} months={months} "
         f"adjust_excluded={adjust_excluded} shift_direction={shift_direction} "
-        f"exclusions={exclusions}",
+        f"exclusions={exclusions} needs_notification={needs_notification}",
     )
     try:
         (
@@ -331,6 +333,7 @@ def add_routine(
         weekday_ok,
         adjust_excluded,
         shift_ok,
+        needs_notification,
         months_ok,
         exclusions_ok,
     )
@@ -353,6 +356,7 @@ def change_routine(
     weekday: str | None,
     adjust_excluded: bool,
     shift_direction: str | None,
+    needs_notification: bool,
     months: list[int],
     exclusions: list[str],
 ) -> dict[str, object]:
@@ -363,7 +367,7 @@ def change_routine(
         f"date_rule={date_rule} day_of_month={day_of_month} weekday_rule={weekday_rule} "
         f"weekday_n={weekday_n} weekday={weekday} months={months} "
         f"adjust_excluded={adjust_excluded} shift_direction={shift_direction} "
-        f"exclusions={exclusions}",
+        f"exclusions={exclusions} needs_notification={needs_notification}",
     )
     existing = get_routine(user_id, routine_id)
     if existing is None or existing.is_deleted:
@@ -420,6 +424,7 @@ def change_routine(
         weekday_ok,
         adjust_excluded,
         shift_ok,
+        needs_notification,
         months_ok,
         exclusions_ok,
     )
@@ -500,6 +505,7 @@ def _apply_one(user_id: int, row: RoutineRow, year: int, month: int) -> dict[str
         None,
         None,
         completed,
+        row.needs_notification,
         row.id,
     )
     write(

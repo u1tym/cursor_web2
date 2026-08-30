@@ -147,6 +147,7 @@ const routineForm = ref({
   weekday_rule: "nth" as "nth" | "nth_from_last",
   weekday_n: 1,
   weekday: "sunday" as (typeof ROUTINE_WEEKDAYS)[number]["value"],
+  needs_notification: false,
   adjust_excluded: false,
   shift_direction: "earlier" as "earlier" | "later",
   months: [...ALL_MONTHS],
@@ -166,6 +167,7 @@ const scheduleForm = ref({
   location: "",
   detail: "",
   is_completed: false,
+  needs_notification: false,
 });
 const categoryForm = ref({ id: null as number | null, name: "", color: "#4DA3FF" });
 const holidayForm = ref({ holiday_date: "", name: "" });
@@ -665,6 +667,7 @@ function openAdd(iso: string): void {
     location: "",
     detail: "",
     is_completed: false,
+    needs_notification: false,
   };
   formError.value = "";
   scheduleOpen.value = true;
@@ -687,6 +690,7 @@ function openEdit(item: ScheduleItem): void {
     location: item.location ?? "",
     detail: item.detail ?? "",
     is_completed: item.is_completed === true,
+    needs_notification: item.needs_notification,
   };
   formError.value = "";
   scheduleOpen.value = true;
@@ -736,6 +740,7 @@ function payload(): SchedulePayload | null {
     start_date: form.start_date,
     end_date: form.end_date,
     category_id: form.category_id,
+    needs_notification: form.needs_notification,
   };
   if (form.location.trim() !== "") {
     body.location = form.location.trim();
@@ -904,6 +909,7 @@ function emptyRoutineForm(): typeof routineForm.value {
     weekday_rule: "nth",
     weekday_n: 1,
     weekday: "sunday",
+    needs_notification: false,
     adjust_excluded: false,
     shift_direction: "earlier",
     months: [...ALL_MONTHS],
@@ -932,6 +938,7 @@ function openRoutineEdit(item: RoutineItem, event: Event): void {
     weekday_rule: item.weekday_rule ?? "nth",
     weekday_n: item.weekday_n ?? 1,
     weekday: item.weekday ?? "sunday",
+    needs_notification: item.needs_notification,
     adjust_excluded: item.adjust_excluded,
     shift_direction: item.shift_direction ?? "earlier",
     months: [...item.months],
@@ -983,6 +990,7 @@ function routinePayload(): RoutinePayload | null {
     category_id: form.category_id,
     occurrence_type: form.occurrence_type,
     adjust_excluded: form.adjust_excluded,
+    needs_notification: form.needs_notification,
     months: [...form.months].sort((left, right) => left - right),
     exclusions: [],
   };
@@ -1769,6 +1777,10 @@ onUnmounted(() => {
             <option value="event">Event</option>
             <option value="todo">TODO</option>
           </select>
+          <label class="check-row">
+            <input v-model="scheduleForm.needs_notification" type="checkbox" :disabled="busy" />
+            Notify
+          </label>
           <input v-model="scheduleForm.location" class="field" placeholder="Location" :disabled="busy" />
           <textarea v-model="scheduleForm.detail" class="field" placeholder="Details" :disabled="busy"></textarea>
           <select
@@ -1843,6 +1855,10 @@ onUnmounted(() => {
             <option value="event">Event</option>
             <option value="todo">TODO</option>
           </select>
+          <label class="check-row">
+            <input v-model="routineForm.needs_notification" type="checkbox" :disabled="busy" />
+            Notify
+          </label>
           <select v-model="routineForm.occurrence_type" class="field" :disabled="busy">
             <option value="date">By date</option>
             <option value="weekday">By weekday</option>

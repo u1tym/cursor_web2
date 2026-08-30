@@ -58,6 +58,7 @@ export type ScheduleItem = {
   category_id: number;
   is_completed: boolean | null;
   routine_id: number | null;
+  needs_notification: boolean;
 };
 
 export type Preferences = {
@@ -88,6 +89,7 @@ export type SchedulePayload = {
   start_time?: string | null;
   end_time?: string | null;
   category_id: number;
+  needs_notification: boolean;
 };
 
 export async function getSettings(): Promise<Settings> {
@@ -372,6 +374,7 @@ export type RoutineItem = {
   weekday: "sunday" | "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | null;
   adjust_excluded: boolean;
   shift_direction: "earlier" | "later" | null;
+  needs_notification: boolean;
   months: number[];
   exclusions: string[];
 };
@@ -389,6 +392,7 @@ export type RoutinePayload = {
   weekday?: RoutineItem["weekday"];
   adjust_excluded: boolean;
   shift_direction?: "earlier" | "later" | null;
+  needs_notification: boolean;
   months: number[];
   exclusions: string[];
 };

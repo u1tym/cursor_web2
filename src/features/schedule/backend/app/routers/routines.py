@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.deps import AuthContext, get_current_user
 from app.errors import InvalidInputError, NotFoundError
@@ -25,6 +25,14 @@ class RoutineBody(BaseModel):
     shift_direction: str | None = None
     months: list[int]
     exclusions: list[str] = Field(default_factory=list)
+    needs_notification: bool
+
+    @field_validator("needs_notification", mode="before")
+    @classmethod
+    def require_bool_notification(cls, value: object) -> object:
+        if not isinstance(value, bool):
+            raise ValueError("needs_notification が真偽でない")
+        return value
 
 
 class ApplyBody(BaseModel):
@@ -59,6 +67,7 @@ def create_routine(
             body.weekday,
             body.adjust_excluded,
             body.shift_direction,
+            body.needs_notification,
             body.months,
             body.exclusions,
         )
@@ -90,6 +99,7 @@ def patch_routine(
             body.weekday,
             body.adjust_excluded,
             body.shift_direction,
+            body.needs_notification,
             body.months,
             body.exclusions,
         )

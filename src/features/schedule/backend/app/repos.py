@@ -65,6 +65,7 @@ class ScheduleRow:
     is_completed: bool | None
     is_deleted: bool
     routine_id: int | None
+    needs_notification: bool
 
 
 @dataclass(frozen=True)
@@ -99,6 +100,7 @@ class RoutineRow:
     weekday: str | None
     adjust_excluded: bool
     shift_direction: str | None
+    needs_notification: bool
     is_deleted: bool
     months: tuple[int, ...]
     exclusions: tuple[str, ...]
@@ -358,12 +360,14 @@ def _schedule_from_row(row: dict[str, object]) -> ScheduleRow:
         is_completed=bool(is_completed) if is_completed is not None else None,
         is_deleted=bool(row["is_deleted"]),
         routine_id=int(row["routine_id"]) if row["routine_id"] is not None else None,
+        needs_notification=bool(row["needs_notification"]),
     )
 
 
 _SCHEDULE_SELECT = """
     SELECT id, user_id, category_id, title, location, detail, kind, granularity,
-           start_date, end_date, start_time, end_time, is_completed, is_deleted, routine_id
+           start_date, end_date, start_time, end_time, is_completed, is_deleted, routine_id,
+           needs_notification
     FROM schedule.schedules
 """
 
@@ -423,6 +427,7 @@ def insert_schedule(
     start_time: time | None,
     end_time: time | None,
     is_completed: bool | None,
+    needs_notification: bool,
     routine_id: int | None = None,
 ) -> ScheduleRow:
     with get_conn() as conn:
@@ -431,12 +436,13 @@ def insert_schedule(
                 """
                 INSERT INTO schedule.schedules (
                     user_id, category_id, title, location, detail, kind, granularity,
-                    start_date, end_date, start_time, end_time, is_completed, routine_id
+                    start_date, end_date, start_time, end_time, is_completed, routine_id,
+                    needs_notification
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id, user_id, category_id, title, location, detail, kind, granularity,
                           start_date, end_date, start_time, end_time, is_completed, is_deleted,
-                          routine_id
+                          routine_id, needs_notification
                 """,
                 (
                     user_id,
@@ -452,6 +458,7 @@ def insert_schedule(
                     end_time,
                     is_completed,
                     routine_id,
+                    needs_notification,
                 ),
             )
             row = cur.fetchone()
@@ -473,6 +480,7 @@ def update_schedule(
     start_time: time | None,
     end_time: time | None,
     is_completed: bool | None,
+    needs_notification: bool,
 ) -> None:
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -481,7 +489,8 @@ def update_schedule(
                 UPDATE schedule.schedules
                 SET category_id = %s, title = %s, location = %s, detail = %s,
                     kind = %s, granularity = %s, start_date = %s, end_date = %s,
-                    start_time = %s, end_time = %s, is_completed = %s
+                    start_time = %s, end_time = %s, is_completed = %s,
+                    needs_notification = %s
                 WHERE id = %s AND user_id = %s AND is_deleted = false
                 """,
                 (
@@ -496,6 +505,7 @@ def update_schedule(
                     start_time,
                     end_time,
                     is_completed,
+                    needs_notification,
                     schedule_id,
                     user_id,
                 ),
@@ -736,6 +746,7 @@ def _routine_from_row(
         weekday=str(weekday) if weekday is not None else None,
         adjust_excluded=bool(row["adjust_excluded"]),
         shift_direction=str(shift_direction) if shift_direction is not None else None,
+        needs_notification=bool(row["needs_notification"]),
         is_deleted=bool(row["is_deleted"]),
         months=months,
         exclusions=exclusions,
@@ -745,7 +756,7 @@ def _routine_from_row(
 _ROUTINE_SELECT = """
     SELECT id, user_id, category_id, title, detail, kind, occurrence_type, date_rule,
            day_of_month, weekday_rule, weekday_n, weekday, adjust_excluded,
-           shift_direction, is_deleted
+           shift_direction, needs_notification, is_deleted
     FROM schedule.routines
 """
 
@@ -839,6 +850,7 @@ def insert_routine(
     weekday: str | None,
     adjust_excluded: bool,
     shift_direction: str | None,
+    needs_notification: bool,
     months: list[int],
     exclusions: list[str],
 ) -> RoutineRow:
@@ -849,12 +861,12 @@ def insert_routine(
                 INSERT INTO schedule.routines (
                     user_id, category_id, title, detail, kind, occurrence_type, date_rule,
                     day_of_month, weekday_rule, weekday_n, weekday, adjust_excluded,
-                    shift_direction
+                    shift_direction, needs_notification
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id, user_id, category_id, title, detail, kind, occurrence_type,
                           date_rule, day_of_month, weekday_rule, weekday_n, weekday,
-                          adjust_excluded, shift_direction, is_deleted
+                          adjust_excluded, shift_direction, needs_notification, is_deleted
                 """,
                 (
                     user_id,
@@ -870,6 +882,7 @@ def insert_routine(
                     weekday,
                     adjust_excluded,
                     shift_direction,
+                    needs_notification,
                 ),
             )
             row = cur.fetchone()
@@ -909,6 +922,7 @@ def update_routine(
     weekday: str | None,
     adjust_excluded: bool,
     shift_direction: str | None,
+    needs_notification: bool,
     months: list[int],
     exclusions: list[str],
 ) -> RoutineRow | None:
@@ -919,11 +933,12 @@ def update_routine(
                 UPDATE schedule.routines
                 SET category_id = %s, title = %s, detail = %s, kind = %s, occurrence_type = %s,
                     date_rule = %s, day_of_month = %s, weekday_rule = %s, weekday_n = %s,
-                    weekday = %s, adjust_excluded = %s, shift_direction = %s
+                    weekday = %s, adjust_excluded = %s, shift_direction = %s,
+                    needs_notification = %s
                 WHERE id = %s AND user_id = %s AND is_deleted = false
                 RETURNING id, user_id, category_id, title, detail, kind, occurrence_type,
                           date_rule, day_of_month, weekday_rule, weekday_n, weekday,
-                          adjust_excluded, shift_direction, is_deleted
+                          adjust_excluded, shift_direction, needs_notification, is_deleted
                 """,
                 (
                     category_id,
@@ -938,6 +953,7 @@ def update_routine(
                     weekday,
                     adjust_excluded,
                     shift_direction,
+                    needs_notification,
                     routine_id,
                     user_id,
                 ),

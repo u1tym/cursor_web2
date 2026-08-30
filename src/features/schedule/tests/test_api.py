@@ -158,6 +158,7 @@ def test_schedule_crud_sort_overlap_and_completion(log_dir: Path) -> None:
             "start_date": "2026-08-10",
             "end_date": "2026-08-12",
             "category_id": cat_id,
+            "needs_notification": False,
         },
     )
     assert day.status_code == 201
@@ -176,6 +177,7 @@ def test_schedule_crud_sort_overlap_and_completion(log_dir: Path) -> None:
             "start_time": "09:00",
             "end_time": "10:00",
             "category_id": cat_id,
+            "needs_notification": False,
         },
     )
     assert todo.status_code == 201
@@ -193,6 +195,7 @@ def test_schedule_crud_sort_overlap_and_completion(log_dir: Path) -> None:
             "start_time": "13:00",
             "end_time": "14:00",
             "category_id": cat_id,
+            "needs_notification": False,
         },
     )
     assert later.status_code == 201
@@ -216,6 +219,7 @@ def test_schedule_crud_sort_overlap_and_completion(log_dir: Path) -> None:
             "start_time": "11:00",
             "end_time": "10:00",
             "category_id": cat_id,
+            "needs_notification": False,
         },
     )
     assert before.status_code == 400
@@ -231,6 +235,7 @@ def test_schedule_crud_sort_overlap_and_completion(log_dir: Path) -> None:
             "start_time": "09:00",
             "end_time": "10:00",
             "category_id": cat_id,
+            "needs_notification": False,
         },
     )
     assert timed_on_day.status_code == 400
@@ -252,6 +257,7 @@ def test_schedule_crud_sort_overlap_and_completion(log_dir: Path) -> None:
             "start_date": "2026-08-10",
             "end_date": "2026-08-12",
             "category_id": cat_id,
+            "needs_notification": False,
         },
     )
     assert to_todo.status_code == 200
@@ -268,6 +274,7 @@ def test_schedule_crud_sort_overlap_and_completion(log_dir: Path) -> None:
             "start_time": "09:00",
             "end_time": "10:00",
             "category_id": cat_id,
+            "needs_notification": False,
         },
     )
     assert to_event.status_code == 200
@@ -303,6 +310,7 @@ def test_other_user_schedule_is_404() -> None:
             "start_date": "2026-08-20",
             "end_date": "2026-08-20",
             "category_id": cat["id"],
+            "needs_notification": False,
         },
     )
     schedule_id = created.json()["id"]
@@ -317,6 +325,7 @@ def test_other_user_schedule_is_404() -> None:
             "start_date": "2026-08-20",
             "end_date": "2026-08-20",
             "category_id": cat["id"],
+            "needs_notification": False,
         },
     )
     assert missing.status_code == 404
@@ -335,6 +344,7 @@ def test_deleted_category_keeps_schedule() -> None:
             "start_date": "2026-09-01",
             "end_date": "2026-09-01",
             "category_id": cat["id"],
+            "needs_notification": False,
         },
     )
     assert created.status_code == 201

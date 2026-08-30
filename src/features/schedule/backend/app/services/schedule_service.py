@@ -93,6 +93,7 @@ def _body(row: ScheduleRow) -> dict[str, object]:
         "category_id": row.category_id,
         "is_completed": row.is_completed,
         "routine_id": row.routine_id,
+        "needs_notification": row.needs_notification,
     }
 
 
@@ -122,13 +123,15 @@ def add_schedule(
     start_time: time | None,
     end_time: time | None,
     category_id: int,
+    needs_notification: bool,
 ) -> dict[str, object]:
     write(
         "INF",
         f"スケジュール追加要求 user_id={user_id} title={title} kind={kind} "
         f"granularity={granularity} start_date={start_date.isoformat()} "
         f"end_date={end_date.isoformat()} start_time={format_time(start_time)} "
-        f"end_time={format_time(end_time)} category_id={category_id}",
+        f"end_time={format_time(end_time)} category_id={category_id} "
+        f"needs_notification={needs_notification}",
     )
     try:
         trimmed = _validate_payload(
@@ -157,6 +160,7 @@ def add_schedule(
         start_time,
         end_time,
         completed,
+        needs_notification,
     )
     write("INF", f"スケジュール追加成功 user_id={user_id} schedule_id={row.id}")
     return _body(row)
@@ -175,13 +179,15 @@ def change_schedule(
     start_time: time | None,
     end_time: time | None,
     category_id: int,
+    needs_notification: bool,
 ) -> dict[str, object]:
     write(
         "INF",
         f"スケジュール更新要求 user_id={user_id} schedule_id={schedule_id} title={title} "
         f"kind={kind} granularity={granularity} start_date={start_date.isoformat()} "
         f"end_date={end_date.isoformat()} start_time={format_time(start_time)} "
-        f"end_time={format_time(end_time)} category_id={category_id}",
+        f"end_time={format_time(end_time)} category_id={category_id} "
+        f"needs_notification={needs_notification}",
     )
     existing = get_schedule(user_id, schedule_id)
     if existing is None or existing.is_deleted:
@@ -219,6 +225,7 @@ def change_schedule(
         start_time,
         end_time,
         completed,
+        needs_notification,
     )
     updated = get_schedule(user_id, schedule_id)
     assert updated is not None

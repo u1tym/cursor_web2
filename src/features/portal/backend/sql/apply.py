@@ -12,7 +12,7 @@ sys.path.insert(0, str(BACKEND_DIR))
 from app.config import load_config  # noqa: E402
 
 SQL_DIR = Path(__file__).resolve().parent
-DDL_PATH = SQL_DIR / "01_public.sql"
+DDL_PATHS = sorted(SQL_DIR.glob("*.sql"))
 
 
 def _create_role_and_db(admin_user: str, admin_password: str) -> None:
@@ -59,7 +59,6 @@ def _create_role_and_db(admin_user: str, admin_password: str) -> None:
 
 def apply_ddl() -> None:
     cfg = load_config()
-    sql = DDL_PATH.read_text(encoding="utf-8")
     conn = psycopg2.connect(
         host=cfg.db_server,
         dbname=cfg.db_name,
@@ -69,7 +68,8 @@ def apply_ddl() -> None:
     )
     try:
         with conn.cursor() as cur:
-            cur.execute(sql)
+            for path in DDL_PATHS:
+                cur.execute(path.read_text(encoding="utf-8"))
         conn.commit()
     finally:
         conn.close()

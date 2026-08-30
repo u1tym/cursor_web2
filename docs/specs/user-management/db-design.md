@@ -4,7 +4,7 @@
 
 この機能が使うスキーマとテーブルの範囲。`requirements.md` の該当 REQ を満たすことだけを書く。
 
-本機能の固有スキーマは作らない。固有テーブルも作らない。DDL は持たない。ユーザ、セッション、システム設定、機能マスタ、メニュー割当はスキーマ `public` の既存表を読む・更新する。機能スキーマへ複製しない。表の作成と初期データは `portal` が担う。
+本機能の固有スキーマは作らない。固有テーブルも作らない。DDL は持たない。ユーザ、セッション、システム設定、機能マスタ、メニュー割当はスキーマ `public` の既存表を読む・更新する。機能スキーマへ複製しない。表の作成と初期データは `portal` が担う。`public.users` のメールアドレス列も `portal` の DDL で足す。
 
 関連ドキュメント:
 
@@ -23,6 +23,7 @@ erDiagram
         integer id PK
         varchar username
         varchar password_hash
+        varchar email
         boolean is_deleted
     }
     sessions {
@@ -53,17 +54,18 @@ erDiagram
 
 ## テーブル設計
 
-列と制約は既存の `public` 表に合わせる。本機能は列を増やさない。
+列と制約は `public` 表に合わせる。メールアドレス列以外は、本機能が列を増やさない。
 
 ### public.users
 
-目的: ログインに使うユーザ。本機能は未削除の一覧、追加、ユーザ名とパスワードの更新、論理削除を行う。パスワードはハッシュのみ保持する。
+目的: ログインに使うユーザ。本機能は未削除の一覧、追加、ユーザ名とメールアドレスとパスワードの更新、論理削除を行う。パスワードはハッシュのみ保持する。メールアドレスはログインに使わない。
 
 | カラム | 型 | NULL | 既定 | 説明 |
 |--------|-----|------|------|------|
 | `id` | integer | NOT NULL | シーケンス | ユーザID。PK |
 | `username` | varchar(255) | NOT NULL | - | ユーザ名。ログインに使う |
 | `password_hash` | varchar(255) | NOT NULL | - | パスワードのハッシュ。平文は置かない |
+| `email` | varchar(255) | NOT NULL | `''` | メールアドレス。ログインには使わない。既存行の初期は空 |
 | `is_deleted` | boolean | NOT NULL | false | 論理削除なら true |
 
 制約:
@@ -78,11 +80,13 @@ erDiagram
 
 本機能の扱い:
 
-- 一覧は `is_deleted = false` のみ。`password_hash` は API に出さない。
-- 追加は `username` とハッシュしたパスワードを挿入する。
-- 更新は未削除行の `username` と、指定があるときだけ `password_hash`。
+- 一覧は `is_deleted = false` のみ。`password_hash` は API に出さない。`email` は出す。
+- 追加は `username`、`email`、ハッシュしたパスワードを挿入する。`email` は空にしない。
+- 更新は未削除行の `username` と `email`、指定があるときだけ `password_hash`。`email` は空にしない。
 - 削除は `is_deleted = true` にする。自分自身（操作中ユーザの `id`）は更新しない。
 - 論理削除時は、そのユーザの `sessions` 行を削除する。
+- `email` の一意制約は無い。形式の検査はサービスが行う（テーブルの検査制約は置かない）。
+- 列の追加は `portal` の DDL が担う。既存行は `email` が空文字になる。
 
 ### public.sessions
 
@@ -217,9 +221,9 @@ erDiagram
 | 要件 | 設計 |
 |------|------|
 | REQ-001 | `public.sessions`、`public.users`、`public.features`（`id = 'user-management'`）、`public.menu_assignments` |
-| REQ-002 | `public.users`（`is_deleted = false`。`password_hash` は出さない） |
-| REQ-003 | `public.users` への挿入（`username`, `password_hash`） |
-| REQ-004 | `public.users` の `username` / `password_hash` 更新 |
+| REQ-002 | `public.users`（`is_deleted = false`。`password_hash` は出さない。`email` は出す） |
+| REQ-003 | `public.users` への挿入（`username`, `password_hash`, `email`） |
+| REQ-004 | `public.users` の `username` / `email` / `password_hash` 更新 |
 | REQ-005 | `public.users.is_deleted`。自己の `id` は更新しない。当該 `sessions` を削除 |
 | REQ-006 | `public.features`（`is_deleted = false`） |
 | REQ-007 | `public.features` への挿入 |
@@ -242,3 +246,5 @@ erDiagram
 |------|------|----------|
 | 2026-08-26 22:57 | 未承認 | 初版 |
 | 2026-08-26 23:00 | 承認済み | 初版を承認 |
+| 2026-08-30 08:24 | 未承認 | `public.users` に `email`（varchar、NOT NULL、既定空文字）を追加。一意制約なし。DDL は portal |
+| 2026-08-30 08:25 | 承認済み | `public.users` の `email` を承認 |

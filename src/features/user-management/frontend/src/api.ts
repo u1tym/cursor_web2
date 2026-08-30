@@ -34,6 +34,7 @@ export type Settings = {
 export type UserItem = {
   id: number;
   username: string;
+  email: string;
   is_self: boolean;
 };
 
@@ -71,10 +72,14 @@ export async function getUsers(): Promise<UserItem[]> {
   return ((await res.json()) as { items: UserItem[] }).items;
 }
 
-export async function createUser(username: string, password: string): Promise<UserItem | "invalid" | "conflict"> {
+export async function createUser(
+  username: string,
+  password: string,
+  email: string,
+): Promise<UserItem | "invalid" | "conflict"> {
   const res = await apiFetch("/users", {
     method: "POST",
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, email }),
   });
   throwIfAuthFailed(res);
   if (res.status === 201) {
@@ -93,8 +98,9 @@ export async function updateUser(
   userId: number,
   username: string,
   password: string,
+  email: string,
 ): Promise<UserItem | "invalid" | "missing" | "conflict"> {
-  const body: { username: string; password?: string } = { username };
+  const body: { username: string; email: string; password?: string } = { username, email };
   if (password !== "") {
     body.password = password;
   }

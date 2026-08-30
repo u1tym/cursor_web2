@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS schedule.routines (
     weekday varchar(16) NULL,
     adjust_excluded boolean NOT NULL DEFAULT false,
     shift_direction varchar(16) NULL,
+    needs_notification boolean NOT NULL DEFAULT false,
     is_deleted boolean NOT NULL DEFAULT false,
     CONSTRAINT routines_user_id_fkey
         FOREIGN KEY (user_id) REFERENCES public.users (id) ON DELETE RESTRICT,

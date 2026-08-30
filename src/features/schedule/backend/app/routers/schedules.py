@@ -24,12 +24,20 @@ class ScheduleBody(BaseModel):
     start_time: str | None = None
     end_time: str | None = None
     category_id: int
+    needs_notification: bool
 
     @field_validator("start_time", "end_time", mode="before")
     @classmethod
     def empty_time_to_none(cls, value: object) -> object:
         if value == "":
             return None
+        return value
+
+    @field_validator("needs_notification", mode="before")
+    @classmethod
+    def require_bool_notification(cls, value: object) -> object:
+        if not isinstance(value, bool):
+            raise ValueError("needs_notification が真偽でない")
         return value
 
 
@@ -85,6 +93,7 @@ def create_schedule(
             start_time,
             end_time,
             body.category_id,
+            body.needs_notification,
         )
     except InvalidInputError:
         raise HTTPException(status_code=400, detail="入力が不正です") from None
@@ -115,6 +124,7 @@ def patch_schedule(
             start_time,
             end_time,
             body.category_id,
+            body.needs_notification,
         )
     except InvalidInputError:
         raise HTTPException(status_code=400, detail="入力が不正です") from None

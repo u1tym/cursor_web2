@@ -906,6 +906,123 @@ GET は行が無ければ初期値（日曜始まり、削除済みを出さな�
 
 ---
 
+## タスク 24
+
+### タイトル
+
+スケジュールとルーチンに `needs_notification` の DDL を追加し、適用する
+
+### 見積もり
+
+1時間
+
+### 関連要件
+
+- REQ-004, REQ-032
+
+### 関連設計
+
+- `db-design.md` / `schedule.schedules`、`schedule.routines`（`needs_notification`）
+- `design.md` / バックエンド設計 / モジュール構成（`sql/`）
+
+### 実装パス
+
+- `src/features/schedule/backend/sql/`
+
+### 内容
+
+`schedules` と `routines` に `needs_notification`（boolean、NOT NULL、既定 false）を足す。既存行は false。`CREATE TABLE IF NOT EXISTS` では列は増えないため、`ALTER TABLE ... ADD COLUMN IF NOT EXISTS` とする。`public` の表は変えない。適用手順は既存の SQL 適用に合わせる。
+
+### 完了条件
+
+- [ ] `schedules.needs_notification` と `routines.needs_notification` がある
+- [ ] 既存行は false
+- [ ] `tstuser` で tstdb に適用できる
+- [ ] `public` に業務表を増やしていない
+
+---
+
+## タスク 25
+
+### タイトル
+
+スケジュールとルーチンの API に `needs_notification` を載せる
+
+### 見積もり
+
+3時間
+
+### 関連要件
+
+- REQ-004, REQ-007, REQ-008, REQ-027, REQ-032, REQ-033, REQ-036, REQ-040
+
+### 関連設計
+
+- `design.md` / バックエンド設計 / 業務ロジック
+- `api-design.md` / `/schedules`、`/routines`、適用 API
+- `db-design.md` / `needs_notification`
+
+### 実装パス
+
+- `src/features/schedule/backend/app/repos.py`
+- `src/features/schedule/backend/app/services/schedule_service.py`
+- `src/features/schedule/backend/app/services/routine_service.py`
+- `src/features/schedule/backend/app/routers/schedules.py`
+- `src/features/schedule/backend/app/routers/routines.py`
+- `src/features/schedule/tests/`
+
+### 内容
+
+GET/POST/PATCH `/schedules` と GET/POST/PATCH `/routines` に `needs_notification` を載せる。必須。真偽でないときは 400。適用で作るスケジュールにはルーチンの値を入れる。手入力追加でも受け付ける。更新で変えられる。ルーチン識別は変えない。操作ログに入力値を残す。
+
+### 完了条件
+
+- [ ] スケジュールの応答に `needs_notification` がある
+- [ ] POST/PATCH `/schedules` で要／不要を保存・更新できる。欠落または真偽でないときは 400
+- [ ] ルーチンの応答に `needs_notification` がある
+- [ ] POST/PATCH `/routines` で要／不要を保存・更新できる。欠落または真偽でないときは 400
+- [ ] 適用で作ったスケジュールの `needs_notification` はルーチンの値である
+- [ ] 成功は INF、想定内の失敗は WRN。入力に `needs_notification` が含まれる
+
+---
+
+## タスク 26
+
+### タイトル
+
+スケジュール入力とルーチン入力に「Notify」を実装する
+
+### 見積もり
+
+2時間
+
+### 関連要件
+
+- REQ-004, REQ-007, REQ-008, REQ-032, REQ-033, REQ-040
+
+### 関連設計
+
+- `ui-design.md` / スケジュール入力、ルーチン入力
+- `api-design.md` / `needs_notification`
+
+### 実装パス
+
+- `src/features/schedule/frontend/src/api.ts`
+- `src/features/schedule/frontend/src/views/CalendarView.vue`
+
+### 内容
+
+スケジュール入力の種別の下に「Notify」チェックを置く。オンは要、オフは不要。追加時はオフ。編集時は対象の値。保存時に送る。ルーチン入力も同じ。カレンダーの日セルと詳細には出さない。
+
+### 完了条件
+
+- [ ] スケジュールの追加・編集で Notify を切替でき、保存できる
+- [ ] ルーチンの追加・編集で Notify を切替でき、保存できる
+- [ ] 追加時の初期値はオフ
+- [ ] カレンダーの日セルと詳細に Notify は出ない
+
+---
+
 ## テスト
 
 ### 単体テスト
@@ -914,6 +1031,7 @@ GET は行が無ければ初期値（日曜始まり、削除済みを出さな�
 - [ ] 開始終了の前後、日単位／時間単位、種別と実施状態、カテゴリ名称重複、ユーザ休日の年月日重複、並び順、期間重なりを確認する
 - [ ] 祝日算出が外部通信しないこと、振替休日を含むことを確認する
 - [ ] ルーチンの適用日タイプ、基準日、除外調整のずらし、指定年月の同一 `routine_id` では登録しないことを確認する
+- [ ] スケジュールとルーチンの `needs_notification`、適用時の転記を確認する
 
 ### 結合テスト
 
@@ -945,3 +1063,5 @@ GET は行が無ければ初期値（日曜始まり、削除済みを出さな�
 | 2026-08-29 23:50 | 承認済み | ルーチンのタスク 16〜21 を承認 |
 | 2026-08-30 00:17 | 未承認 | ルーチン更新 API と、編集・適用年月ダイアログ・横スクロール解消（タスク 22〜23） |
 | 2026-08-30 00:23 | 承認済み | タスク 22〜23 を承認 |
+| 2026-08-30 08:02 | 未承認 | 通知要不要（タスク 24〜26）。DDL・API・入力の Notify |
+| 2026-08-30 08:04 | 承認済み | タスク 24〜26 を承認 |

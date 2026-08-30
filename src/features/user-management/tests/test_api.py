@@ -95,22 +95,35 @@ def test_user_crud_and_self_delete(log_dir: Path) -> None:
     assert listed.status_code == 200
     for item in listed.json()["items"]:
         assert "password" not in item
+        assert "email" in item
         if item["id"] == op_id:
             assert item["is_self"] is True
 
-    created = client.post("/users", json={"username": _unique("new"), "password": "pw-secret"})
+    created = client.post(
+        "/users",
+        json={"username": _unique("new"), "password": "pw-secret", "email": "new@example.com"},
+    )
     assert created.status_code == 201
     new_id = created.json()["id"]
     assert created.json()["is_self"] is False
+    assert created.json()["email"] == "new@example.com"
+    assert "password" not in created.json()
 
-    dup = client.post("/users", json={"username": created.json()["username"], "password": "x"})
+    dup = client.post(
+        "/users",
+        json={"username": created.json()["username"], "password": "x", "email": "dup@example.com"},
+    )
     assert dup.status_code == 409
     assert dup.json() == {"detail": "保存できませんでした"}
 
     renamed = _unique("ren")
-    patched = client.patch(f"/users/{new_id}", json={"username": renamed})
+    patched = client.patch(
+        f"/users/{new_id}",
+        json={"username": renamed, "email": "ren@example.com"},
+    )
     assert patched.status_code == 200
     assert patched.json()["username"] == renamed
+    assert patched.json()["email"] == "ren@example.com"
 
     deleted = client.delete(f"/users/{new_id}")
     assert deleted.status_code == 204

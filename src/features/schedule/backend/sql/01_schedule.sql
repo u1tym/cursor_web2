@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS schedule.schedules (
     end_time time NULL,
     is_completed boolean NULL,
     is_deleted boolean NOT NULL DEFAULT false,
+    needs_notification boolean NOT NULL DEFAULT false,
     CONSTRAINT schedules_user_id_fkey
         FOREIGN KEY (user_id) REFERENCES public.users (id) ON DELETE RESTRICT,
     CONSTRAINT schedules_category_id_fkey

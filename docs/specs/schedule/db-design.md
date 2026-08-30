@@ -88,6 +88,7 @@ erDiagram
         time end_time
         bool is_completed
         integer routine_id FK
+        bool needs_notification
         bool is_deleted
     }
     preferences {
@@ -121,6 +122,7 @@ erDiagram
         varchar weekday
         bool adjust_excluded
         varchar shift_direction
+        bool needs_notification
         bool is_deleted
     }
     routine_months {
@@ -182,6 +184,7 @@ erDiagram
 | `end_time` | time | NULL | - | 終了時刻（分まで）。日単位は NULL。秒は持たない |
 | `is_completed` | boolean | NULL | - | TODO の実施済み。予定は NULL。TODO は NOT NULL |
 | `routine_id` | integer | NULL | NULL | 適用元のルーチン。`schedule.routines.id`。手入力は NULL |
+| `needs_notification` | boolean | NOT NULL | false | 通知要なら true、不要なら false |
 | `is_deleted` | boolean | NOT NULL | false | 論理削除なら true |
 
 制約:
@@ -211,6 +214,8 @@ erDiagram
 `category_id` は、追加および更新では本人の未削除カテゴリだけを指定できる。削除済みカテゴリが付いた既存行は残してよい（カテゴリ論理削除時に `category_id` は変えない）。
 
 `routine_id` は手入力の追加では NULL。適用で作るときだけルーチンの `id` を入れる。更新では `routine_id` を変えない。ルーチンの論理削除ではスケジュール行を残し、`routine_id` は維持する。既存行の初期値は NULL。
+
+`needs_notification` は要なら true、不要なら false。空は置かない。追加時の既定は false。適用で作るときはルーチンの `needs_notification` を入れる。既存行の初期値は false。
 
 `user_id` はカテゴリの `user_id` と一致させる（本人のカテゴリだけ）。物理削除はしない。
 
@@ -307,6 +312,7 @@ erDiagram
 | `weekday` | varchar(16) | NULL | - | 曜日指定のとき必須。`sunday`〜`saturday`。日付指定のとき NULL |
 | `adjust_excluded` | boolean | NOT NULL | false | 除外調整日が有なら true |
 | `shift_direction` | varchar(16) | NULL | - | 除外調整が有のとき必須。`earlier`（前）または `later`（後）。無のとき NULL |
+| `needs_notification` | boolean | NOT NULL | false | 通知要なら true、不要なら false |
 | `is_deleted` | boolean | NOT NULL | false | 論理削除なら true |
 
 制約:
@@ -326,7 +332,7 @@ erDiagram
 
 - `(user_id)` のうち `is_deleted = false`
 
-`category_id` は追加・更新時に本人の未削除カテゴリだけを指定できる。カテゴリの論理削除ではルーチン行を残し、`category_id` は変えない。`user_id` はカテゴリの `user_id` と一致させる。物理削除はしない。項目は更新できる。紐づくスケジュールは更新しない。一覧は未削除のみ、`title` の昇順、同じなら `id` の昇順。
+`category_id` は追加・更新時に本人の未削除カテゴリだけを指定できる。カテゴリの論理削除ではルーチン行を残し、`category_id` は変えない。`user_id` はカテゴリの `user_id` と一致させる。物理削除はしない。項目は更新できる。紐づくスケジュールは更新しない。`needs_notification` は要なら true、不要なら false。空は置かない。追加時の既定は false。一覧は未削除のみ、`title` の昇順、同じなら `id` の昇順。
 
 ### schedule.routine_months
 
@@ -523,11 +529,11 @@ erDiagram
 | REQ-001 | `public.sessions`、`public.users`、`public.features`（`id = 'schedule'`）、`public.menu_assignments` |
 | REQ-002 | `schedule.categories.user_id`、`schedule.schedules.user_id`、`schedule.preferences.user_id`、`schedule.hidden_categories.user_id`、`schedule.user_holidays.user_id`、`schedule.routines.user_id` |
 | REQ-003 | `schedule.schedules.kind`、`is_completed` |
-| REQ-004 | `schedule.schedules` のタイトル・開始終了・カテゴリ・場所・詳細・粒度・種別・`routine_id` |
+| REQ-004 | `schedule.schedules` のタイトル・開始終了・カテゴリ・場所・詳細・粒度・種別・`needs_notification`・`routine_id` |
 | REQ-005 | `granularity`、`start_date` / `end_date`、`start_time` / `end_time` |
 | REQ-006 | 開始・終了の検査制約 |
-| REQ-007 | `schedule.schedules` への挿入。手入力は `routine_id` NULL |
-| REQ-008 | `schedule.schedules` の更新（`is_deleted = false`）。`routine_id` は変えない |
+| REQ-007 | `schedule.schedules` への挿入。手入力は `routine_id` NULL。`needs_notification` の既定は false |
+| REQ-008 | `schedule.schedules` の更新（`is_deleted = false`）。`routine_id` は変えない。`needs_notification` は変えられる |
 | REQ-009 | `schedule.schedules.is_deleted` |
 | REQ-010 | `schedule.schedules.is_completed`（`kind = 'todo'`） |
 | REQ-011 | `schedule.categories` への挿入。部分一意 `(user_id, name)` |
@@ -546,11 +552,11 @@ erDiagram
 | REQ-029 | `schedule.user_holidays` の `holiday_date` / `name` 更新。部分一意 |
 | REQ-030 | `schedule.user_holidays.is_deleted` |
 | REQ-031 | `schedule.routines.id` |
-| REQ-032 | `schedule.routines`、`schedule.routine_months`、`schedule.routine_exclusions` |
+| REQ-032 | `schedule.routines`、`schedule.routine_months`、`schedule.routine_exclusions`。`needs_notification` を含む |
 | REQ-033 | `schedule.routines` への挿入。反映月は `routine_months` |
 | REQ-034 | `schedule.routines.is_deleted`。スケジュールの `routine_id` は維持 |
 | REQ-035 | テーブルなし（画面） |
-| REQ-036 | `schedule.schedules` への挿入（`routine_id` 付き）。同一 `routine_id` の指定年月はインデックスで確認 |
+| REQ-036 | `schedule.schedules` への挿入（`routine_id` 付き）。`needs_notification` はルーチンの値。同一 `routine_id` の指定年月はインデックスで確認 |
 | REQ-037 | REQ-036 と同じ表。未削除ルーチンの列挙 |
 | REQ-038 | テーブルなし（基準日は算出） |
 | REQ-039 | `schedule.routines.adjust_excluded` / `shift_direction`、`schedule.routine_exclusions`。祝日は算出 |
@@ -575,3 +581,5 @@ erDiagram
 | 2026-08-29 23:41 | 承認済み | ルーチン表と反映月・除外対象の子表、スケジュールの `routine_id` を承認 |
 | 2026-08-30 00:17 | 未承認 | ルーチン項目の更新。反映月・除外対象は更新時に置き換える |
 | 2026-08-30 00:23 | 承認済み | ルーチン項目の更新と反映月・除外の置き換えを承認 |
+| 2026-08-30 08:00 | 未承認 | `schedules` と `routines` に `needs_notification`（boolean、既定 false）を追加 |
+| 2026-08-30 08:01 | 承認済み | `schedules` と `routines` の `needs_notification` を承認 |
