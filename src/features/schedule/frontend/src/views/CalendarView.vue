@@ -59,7 +59,7 @@ import {
 
 const emit = defineEmits<{ "auth-error": [unknown] }>();
 
-const ITEM_ROW_PX = 24;
+const ITEM_ROW_PX = 17;
 const LEFTOVER_ROW_PX = 20;
 const LEFTOVER_HIDE_MS = 1000;
 
@@ -2140,18 +2140,18 @@ onUnmounted(() => {
 .item-row {
   display: flex;
   align-items: center;
-  gap: var(--space);
+  gap: 4px;
   width: 100%;
   max-width: 100%;
   min-width: 0;
   text-align: left;
   border: 0;
   border-radius: 2px;
-  padding: 2px var(--space);
-  min-height: 22px;
-  font-size: 14px;
+  padding: 0 4px;
+  min-height: 16px;
+  font-size: 12px;
   line-height: 1.2;
-  margin-top: 2px;
+  margin-top: 1px;
   overflow: hidden;
   cursor: pointer;
 }
@@ -2166,6 +2166,9 @@ onUnmounted(() => {
 
 .item-row input {
   flex: none;
+  width: 12px;
+  height: 12px;
+  margin: 0;
 }
 
 .item-row.done span {
