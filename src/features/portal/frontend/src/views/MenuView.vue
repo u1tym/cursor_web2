@@ -26,7 +26,9 @@ onMounted(async () => {
 });
 
 function openFeature(item: MenuItem): void {
-  window.location.href = item.url;
+  const target = new URL(item.url, window.location.origin);
+  target.searchParams.set("a", String(Math.floor(Math.random() * 1_000_000_000)));
+  window.location.href = target.href;
 }
 
 async function onLogout(): Promise<void> {
