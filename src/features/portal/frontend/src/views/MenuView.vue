@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { getMenu, logout, type MenuItem } from "../api";
+import { getMenu, logMenuNavigation, logout, type MenuItem } from "../api";
 
 const router = useRouter();
 const items = ref<MenuItem[]>([]);
@@ -14,6 +14,10 @@ onMounted(async () => {
   error.value = "";
   try {
     items.value = await getMenu();
+    console.log(
+      "[portal menu] 取得",
+      items.value.map((item) => ({ id: item.id, title: item.title, url: item.url })),
+    );
   } catch (exc) {
     if (exc instanceof Error && exc.message === "unauth") {
       await router.replace("/login");
@@ -25,10 +29,39 @@ onMounted(async () => {
   }
 });
 
-function openFeature(item: MenuItem): void {
-  const target = new URL(item.url, window.location.origin);
-  target.searchParams.set("a", String(Math.floor(Math.random() * 1_000_000_000)));
-  window.location.href = target.href;
+async function openFeature(item: MenuItem): Promise<void> {
+  const fromDb = item.url;
+  let destination = "";
+  let errorMessage = "";
+  try {
+    const target = new URL(fromDb, window.location.origin);
+    target.searchParams.set("a", String(Math.floor(Math.random() * 1_000_000_000)));
+    destination = target.href;
+  } catch (exc) {
+    errorMessage = exc instanceof Error ? exc.message : String(exc);
+  }
+  console.log("[portal menu] 遷移", {
+    id: item.id,
+    title: item.title,
+    fromDb,
+    destination,
+    currentPage: window.location.href,
+    error: errorMessage || undefined,
+  });
+  try {
+    await logMenuNavigation({
+      id: item.id,
+      title: item.title,
+      from_db: fromDb,
+      destination,
+      error: errorMessage,
+    });
+  } catch {
+    // 遷移はログ失敗でも続ける
+  }
+  if (destination) {
+    window.location.href = destination;
+  }
 }
 
 async function onLogout(): Promise<void> {

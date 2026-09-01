@@ -11,8 +11,9 @@ from fastapi.testclient import TestClient
 
 from app.logger import LOG_FILE, LOG_NAME, close_logging, setup_logging
 from app.main import app
-from app.repos import insert_user, logical_delete_user
+from app.repos import insert_assignment, insert_feature, insert_user, logical_delete_user
 from app.security import hash_password
+from png_bytes import PNG_1X1
 
 _STAMP = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} ")
 
@@ -153,3 +154,58 @@ def test_login_blank_logs_invalid_input(
     text = _log_text(log_dir)
     assert "INF ログイン要求 username=" in text
     assert "WRN ログイン失敗 username= 理由=入力不正" in text
+
+
+def test_menu_get_logs_urls_from_db(
+    client: TestClient,
+    log_dir: Path,
+) -> None:
+    username = _unique("menu")
+    user = insert_user(username, hash_password("secret"))
+    feature_id = _unique("feat")
+    insert_feature(feature_id, "デモ", "http://example.local/demo", PNG_1X1, "image/png")
+    insert_assignment(user.id, feature_id, 1)
+    login = client.post("/auth/login", json={"username": username, "password": "secret"})
+    assert login.status_code == 204
+
+    res = client.get("/menu")
+    assert res.status_code == 200
+    text = _log_text(log_dir)
+    assert f"INF メニュー取得要求 username={username}" in text
+    assert f"INF メニュー取得成功 username={username} count=1" in text
+    assert f"INF メニュー項目 id={feature_id} title=デモ url=http://example.local/demo" in text
+    session_id = login.cookies.get("session_id")
+    assert session_id
+    assert session_id not in text
+
+
+def test_menu_nav_log_writes_from_db_and_destination(
+    client: TestClient,
+    log_dir: Path,
+) -> None:
+    username = _unique("nav")
+    insert_user(username, hash_password("secret"))
+    login = client.post("/auth/login", json={"username": username, "password": "secret"})
+    assert login.status_code == 204
+
+    res = client.post(
+        "/menu/nav-log",
+        json={
+            "id": "schedule",
+            "title": "予定",
+            "from_db": "https://example.local/portal_schedule",
+            "destination": "https://example.local/portal_schedule?a=123",
+            "error": "",
+        },
+    )
+    assert res.status_code == 204
+    text = _log_text(log_dir)
+    assert (
+        f"INF メニュー遷移 username={username} id=schedule title=予定"
+        " from_db=https://example.local/portal_schedule"
+        " destination=https://example.local/portal_schedule?a=123 error="
+    ) in text
+    session_id = login.cookies.get("session_id")
+    assert session_id
+    assert session_id not in text
+    assert "session_id=" not in text

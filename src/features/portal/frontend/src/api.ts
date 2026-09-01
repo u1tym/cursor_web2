@@ -79,3 +79,19 @@ export async function getMenu(): Promise<MenuItem[]> {
   const body = (await res.json()) as { items: MenuItem[] };
   return body.items;
 }
+
+export type MenuNavLog = {
+  id: string;
+  title: string;
+  from_db: string;
+  destination: string;
+  error: string;
+};
+
+export async function logMenuNavigation(payload: MenuNavLog): Promise<void> {
+  await apiFetch("/menu/nav-log", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    keepalive: true,
+  });
+}
